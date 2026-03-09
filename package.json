@@ -1,0 +1,33 @@
+{
+  "name": "@linhey/react-debug-inspector",
+  "version": "1.0.0",
+  "description": "A developer tool to inspect React components in browser and jump to source code.",
+  "author": "linhey",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "tsup src/index.ts --format cjs,esm --watch --dts",
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "tsup": "^8.0.2",
+    "typescript": "^5.4.2"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0"
+  },
+  "keywords": [
+    "react",
+    "debug",
+    "inspector",
+    "vite",
+    "babel-plugin"
+  ]
+}
