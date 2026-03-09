@@ -1,0 +1,34 @@
+# Source files
+src/
+*.test.ts
+*.test.tsx
+*.spec.ts
+
+# Test files and directories
+e2e/
+test-app/
+test-results/
+playwright-report/
+coverage/
+
+# Configuration files
+.github/
+tsconfig.json
+vitest.config.ts
+playwright.config.ts
+vite.config.test.ts
+
+# Development files
+.git/
+.gitignore
+.npmignore
+.eslintrc*
+.prettierrc*
+*.log
+node_modules/
+
+# Documentation (keep README and CHANGELOG)
+# Add other docs you don't want to publish
+
+# Build artifacts (keep dist/)
+*.tsbuildinfo

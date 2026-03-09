@@ -5,6 +5,17 @@ export function initInspector() {
   if (typeof window === 'undefined') return;
 
   let isInspecting = false;
+  let hasUserPosition = false;
+  let isDragging = false;
+  let pointerMoved = false;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let overlay: HTMLDivElement | null = null;
+  let tooltip: HTMLDivElement | null = null;
+  const edgeOffset = 24;
+  type Anchor = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 
   // 1. 创建触发按钮
   const toggleBtn = document.createElement('button');
@@ -31,8 +42,124 @@ export function initInspector() {
   `;
   document.body.appendChild(toggleBtn);
 
+  const applyAnchor = (anchor: Anchor) => {
+    if (hasUserPosition) return;
+    toggleBtn.style.top = anchor.startsWith('top') ? `${edgeOffset}px` : '';
+    toggleBtn.style.bottom = anchor.startsWith('bottom') ? `${edgeOffset}px` : '';
+    if (anchor.endsWith('left')) {
+      toggleBtn.style.left = `${edgeOffset}px`;
+      toggleBtn.style.right = '';
+      return;
+    }
+    toggleBtn.style.right = `${edgeOffset}px`;
+    toggleBtn.style.left = '';
+  };
+
+  const getVisibleDialogs = () => {
+    if (typeof document === 'undefined') return [] as HTMLElement[];
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="dialog"], dialog[open], [aria-modal="true"]'),
+    );
+    return candidates.filter((node) => {
+      if (node.getAttribute('aria-hidden') === 'true') return false;
+      if (node.getAttribute('data-aria-hidden') === 'true') return false;
+      const style = window.getComputedStyle(node);
+      return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+    });
+  };
+
+  const ensureToggleHost = (host: HTMLElement) => {
+    if (toggleBtn.parentElement !== host) {
+      host.appendChild(toggleBtn);
+    }
+  };
+
+  const isIgnorableObstacle = (el: Element) => {
+    if (el === toggleBtn || el === overlay || el === tooltip) return true;
+    if (el instanceof HTMLElement) {
+      if (el.contains(toggleBtn) || toggleBtn.contains(el)) return true;
+      if (overlay && el.contains(overlay)) return true;
+      if (tooltip && el.contains(tooltip)) return true;
+      if (el === document.body || el === document.documentElement) return true;
+      if (el.getAttribute('data-inspector-ignore') === 'true') return true;
+      const style = window.getComputedStyle(el);
+      if (style.pointerEvents === 'none') return true;
+      if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return true;
+    }
+    return false;
+  };
+
+  const sampleAnchorObstructionScore = () => {
+    const pickStack =
+      typeof document.elementsFromPoint === 'function'
+        ? (x: number, y: number) => document.elementsFromPoint(x, y)
+        : (x: number, y: number) => {
+          const one = document.elementFromPoint?.(x, y);
+          return one ? [one] : [];
+        };
+    const rect = toggleBtn.getBoundingClientRect();
+    const points = [
+      [rect.left + rect.width / 2, rect.top + rect.height / 2],
+      [rect.left + 2, rect.top + 2],
+      [rect.right - 2, rect.top + 2],
+      [rect.left + 2, rect.bottom - 2],
+      [rect.right - 2, rect.bottom - 2],
+    ];
+    let score = 0;
+    for (const [x, y] of points) {
+      const stack = pickStack(x, y);
+      const blocker = stack.find((el) => !isIgnorableObstacle(el));
+      if (blocker) score += 1;
+    }
+    return score;
+  };
+
+  const pickBestAnchor = (preferLeft = false) => {
+    const candidates: Anchor[] = preferLeft
+      ? ['bottom-left', 'top-left', 'bottom-right', 'top-right']
+      : ['bottom-right', 'top-right', 'bottom-left', 'top-left'];
+    let best = candidates[0];
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const anchor of candidates) {
+      applyAnchor(anchor);
+      const score = sampleAnchorObstructionScore();
+      if (score < bestScore) {
+        bestScore = score;
+        best = anchor;
+      }
+      if (score === 0) break;
+    }
+    applyAnchor(best);
+  };
+
+  const updateAnchorForDialogs = () => {
+    if (typeof document === 'undefined') return;
+    const dialogs = getVisibleDialogs();
+    if (dialogs.length > 0) {
+      ensureToggleHost(dialogs[dialogs.length - 1]);
+      pickBestAnchor(true);
+      return;
+    }
+    ensureToggleHost(document.body);
+    pickBestAnchor(false);
+  };
+
+  const dialogObserver = new MutationObserver(() => {
+    updateAnchorForDialogs();
+  });
+  dialogObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'open', 'aria-hidden'],
+  });
+  window.addEventListener('beforeunload', () => dialogObserver.disconnect(), { once: true });
+  window.addEventListener('resize', updateAnchorForDialogs);
+  window.addEventListener('scroll', updateAnchorForDialogs, true);
+  updateAnchorForDialogs();
+
   // 2. 创建高亮遮罩
-  const overlay = document.createElement('div');
+  overlay = document.createElement('div');
   overlay.style.cssText = `
     position: fixed;
     pointer-events: none;
@@ -45,10 +172,10 @@ export function initInspector() {
   document.body.appendChild(overlay);
 
   // 3. 创建提示标签
-  const tooltip = document.createElement('div');
+  tooltip = document.createElement('div');
   tooltip.style.cssText = `
     position: fixed;
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 9999999;
     background: #1e293b;
     color: #38bdf8;
@@ -61,6 +188,7 @@ export function initInspector() {
     display: none;
     white-space: nowrap;
     transition: all 0.1s ease-out;
+    cursor: help;
   `;
   document.body.appendChild(tooltip);
 
@@ -73,7 +201,47 @@ export function initInspector() {
     tooltip.style.display = 'none';
   };
 
-  toggleBtn.onclick = () => {
+  const onPointerMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+    const deltaX = Math.abs(e.clientX - dragStartX);
+    const deltaY = Math.abs(e.clientY - dragStartY);
+    if (deltaX > 3 || deltaY > 3) {
+      pointerMoved = true;
+    }
+    const left = Math.max(8, Math.min(window.innerWidth - 52, e.clientX - dragOffsetX));
+    const top = Math.max(8, Math.min(window.innerHeight - 52, e.clientY - dragOffsetY));
+    toggleBtn.style.left = `${left}px`;
+    toggleBtn.style.top = `${top}px`;
+    toggleBtn.style.right = '';
+    toggleBtn.style.bottom = '';
+    hasUserPosition = true;
+  };
+
+  const onPointerUp = () => {
+    isDragging = false;
+    window.removeEventListener('mousemove', onPointerMove);
+    window.removeEventListener('mouseup', onPointerUp);
+  };
+
+  toggleBtn.addEventListener('mousedown', (e) => {
+    const rect = toggleBtn.getBoundingClientRect();
+    isDragging = true;
+    pointerMoved = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+  });
+
+  toggleBtn.onclick = (e) => {
+    if (pointerMoved) {
+      e.preventDefault();
+      e.stopPropagation();
+      pointerMoved = false;
+      return;
+    }
     isInspecting = !isInspecting;
     if (isInspecting) {
       toggleBtn.style.transform = 'scale(0.9)';
@@ -82,6 +250,20 @@ export function initInspector() {
     } else {
       stopInspecting();
     }
+  };
+
+  // 格式化显示文本：优化长路径显示
+  const formatDebugId = (debugId: string) => {
+    const parts = debugId.split(':');
+    if (parts.length === 4) {
+      // 新格式: filePath:componentName:tagName:line
+      const [filePath, componentName, tagName, line] = parts;
+      // 只显示文件名（不含路径）
+      const fileName = filePath.split('/').pop() || filePath;
+      return `${fileName} › ${componentName} › ${tagName}:${line}`;
+    }
+    // 兼容旧格式: componentName:tagName:line
+    return debugId.replace(/:/g, ' › ');
   };
 
   window.addEventListener('mousemove', (e) => {
@@ -101,8 +283,9 @@ export function initInspector() {
       overlay.style.height = rect.height + 'px';
 
       tooltip.style.display = 'block';
-      tooltip.textContent = debugId;
+      tooltip.textContent = formatDebugId(debugId);
       tooltip.style.color = '#38bdf8';
+      tooltip.title = debugId; // 完整路径显示在 title 中
 
       const tooltipY = rect.top < 30 ? rect.bottom + 4 : rect.top - 28;
       tooltip.style.top = tooltipY + 'px';
