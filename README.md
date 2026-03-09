@@ -1,5 +1,9 @@
 # @linhey/react-debug-inspector 🎯
 
+[![npm version](https://img.shields.io/npm/v/@linhey/react-debug-inspector)](https://www.npmjs.com/package/@linhey/react-debug-inspector)
+[![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![repo](https://img.shields.io/badge/github-linhay%2Freact--debug--inspector-181717?logo=github)](https://github.com/linhay/react-debug-inspector)
+
 一个轻量级的 React 调试辅助工具，让你在浏览器中直接识别组件、标签及其对应的源码行号。
 
 ## 特性
