@@ -45,6 +45,12 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     return button as HTMLButtonElement;
   };
 
+  const isMenuButtonVisible = (label: string) => {
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const button = buttons.find((el) => el.textContent?.trim() === label) as HTMLButtonElement | undefined;
+    return !!button && button.style.display !== 'none';
+  };
+
   const hoverTarget = (target: HTMLElement) => {
     initInspector();
     const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
@@ -97,6 +103,19 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     expect(getMenuButton('全部复制')).toBeTruthy();
   });
 
+  it('should hide text and image actions when target has neither text nor image', () => {
+    const testDiv = document.createElement('div');
+    testDiv.setAttribute('data-debug', 'src/components/Spacer.tsx:Spacer:div:12');
+    document.body.appendChild(testDiv);
+
+    hoverTarget(testDiv);
+
+    expect(getMenuButton('复制 ID')).toBeTruthy();
+    expect(isMenuButtonVisible('复制文案')).toBe(false);
+    expect(isMenuButtonVisible('复制图片')).toBe(false);
+    expect(getMenuButton('全部复制')).toBeTruthy();
+  });
+
   it('should copy full debug ID from menu', async () => {
     const testDiv = document.createElement('div');
     const debugId = 'src/components/Button.tsx:Button:button:42';
@@ -135,16 +154,14 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     expect(mockClipboard.writeText).toHaveBeenCalledWith('Accessible Reset');
   });
 
-  it('should fallback to debug ID when text content is missing', async () => {
+  it('should not show text action when text content is missing', async () => {
     const testDiv = document.createElement('div');
     const debugId = 'src/components/Button.tsx:Button:button:42';
     testDiv.setAttribute('data-debug', debugId);
     document.body.appendChild(testDiv);
 
     hoverTarget(testDiv);
-    getMenuButton('复制文案').click();
-
-    expect(mockClipboard.writeText).toHaveBeenCalledWith(debugId);
+    expect(isMenuButtonVisible('复制文案')).toBe(false);
   });
 
   it('should copy image binary when ClipboardItem is supported', async () => {
@@ -205,6 +222,20 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[debug]'));
     expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[text]'));
     expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[image]'));
+  });
+
+  it('should omit absent text and image sections from copy all payload', async () => {
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('data-debug', 'src/components/Spacer.tsx:Spacer:div:8');
+    document.body.appendChild(wrapper);
+
+    hoverTarget(wrapper);
+    getMenuButton('全部复制').click();
+
+    const copied = mockClipboard.writeText.mock.calls.at(-1)?.[0];
+    expect(copied).toContain('[debug]');
+    expect(copied).not.toContain('[text]');
+    expect(copied).not.toContain('[image]');
   });
 
   it('should keep inspection mode active after menu action', async () => {

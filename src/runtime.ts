@@ -22,6 +22,7 @@ export function initInspector() {
     filename: string;
     source: 'img' | 'background';
   };
+  type ActionKind = 'id' | 'text' | 'image' | 'all';
 
   let isInspecting = false;
   let overlay: HTMLDivElement | null = null;
@@ -36,6 +37,7 @@ export function initInspector() {
   const successColor = '#10b981';
   const defaultOverlayBg = 'rgba(14, 165, 233, 0.15)';
   const defaultOverlayBorder = '#0ea5e9';
+  const actionButtons: Partial<Record<ActionKind, HTMLButtonElement>> = {};
 
   const scheduleFrame = (cb: FrameRequestCallback) => {
     if (typeof win.requestAnimationFrame === 'function') {
@@ -280,23 +282,31 @@ export function initInspector() {
   ].join('\n');
 
   const buildCopyAllPayload = (context: InspectContext) => {
-    const textValue = extractTextContent(context.debugEl) || context.debugId;
+    const textValue = extractTextContent(context.debugEl);
     const image = resolveImageTarget(context.debugEl);
-    return [
+    const lines = [
       '[debug]',
       `id: ${context.debugId}`,
       `display: ${formatDebugId(context.debugId)}`,
-      '',
-      '[text]',
-      `value: ${textValue}`,
-      '',
-      '[image]',
-      `status: ${image ? 'copied-metadata' : 'none'}`,
-      `url: ${image?.url || ''}`,
-      `alt: ${image?.alt || ''}`,
-      `title: ${image?.title || ''}`,
-      `filename: ${image?.filename || ''}`,
-    ].join('\n');
+    ];
+    if (textValue) {
+      lines.push('', '[text]', `value: ${textValue}`);
+    }
+    if (image) {
+      lines.push('', '[image]', `url: ${image.url}`, `alt: ${image.alt}`, `title: ${image.title}`, `filename: ${image.filename}`);
+    }
+    return lines.join('\n');
+  };
+
+  const syncActionMenuVisibility = (context: InspectContext) => {
+    actionButtons.id && (actionButtons.id.style.display = '');
+    actionButtons.all && (actionButtons.all.style.display = '');
+    if (actionButtons.text) {
+      actionButtons.text.style.display = extractTextContent(context.debugEl) ? '' : 'none';
+    }
+    if (actionButtons.image) {
+      actionButtons.image.style.display = resolveImageTarget(context.debugEl) ? '' : 'none';
+    }
   };
 
   const setOverlayTone = (tone: FeedbackTone) => {
@@ -358,6 +368,7 @@ export function initInspector() {
 
   const showActionMenu = (context: InspectContext) => {
     if (!actionMenu) return;
+    syncActionMenuVisibility(context);
     actionMenu.style.display = 'flex';
     positionActionMenu(context);
   };
@@ -403,7 +414,8 @@ export function initInspector() {
     }
 
     if (action === 'text') {
-      const textValue = extractTextContent(context.debugEl) || context.debugId;
+      const textValue = extractTextContent(context.debugEl);
+      if (!textValue) return;
       await copyText(textValue);
       showCopyFeedback('已复制文案', 'success');
       return;
@@ -530,7 +542,7 @@ export function initInspector() {
     border: 1px solid rgba(148, 163, 184, 0.25);
     align-items: center;
   `;
-  const actionDefinitions: Array<{ action: 'id' | 'text' | 'image' | 'all'; label: string }> = [
+  const actionDefinitions: Array<{ action: ActionKind; label: string }> = [
     { action: 'id', label: '复制 ID' },
     { action: 'text', label: '复制文案' },
     { action: 'image', label: '复制图片' },
@@ -559,6 +571,7 @@ export function initInspector() {
       if (!latestContext) return;
       await performCopyAction(definition.action, latestContext);
     });
+    actionButtons[definition.action] = button;
     actionMenu.appendChild(button);
   }
   doc.body.appendChild(actionMenu);
