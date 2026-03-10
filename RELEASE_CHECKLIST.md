@@ -48,7 +48,7 @@
 
 ## ✅ GitHub 配置
 
-- [ ] NPM_TOKEN 已配置在 GitHub Secrets
+- [ ] npm Trusted Publisher 已配置（OIDC）
 - [ ] GitHub Actions 工作流文件存在
   - [ ] .github/workflows/ci.yml
   - [ ] .github/workflows/publish.yml

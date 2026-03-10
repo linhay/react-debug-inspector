@@ -27,16 +27,17 @@
 ### 2. Publish to NPM - `.github/workflows/publish.yml`
 
 **触发条件:**
-- 创建 GitHub Release 时自动触发
+- `Version Bump and Release` 完成后自动触发
+- 可手动触发 (`workflow_dispatch`)
 
 **功能:**
 - 安装依赖
 - 运行测试
 - 构建项目
-- 发布到 NPM (带 provenance)
+- 通过 Trusted Publishing 发布到 NPM (带 provenance)
 
 **前置要求:**
-1. 在 GitHub 仓库设置中添加 `NPM_TOKEN` secret
+1. 在 npm 包设置中配置 Trusted Publisher（GitHub Actions OIDC）
 2. 创建 GitHub Release
 
 ---
@@ -106,26 +107,13 @@
 
 ---
 
-## 🔑 配置 NPM Token
+## 🔐 配置 Trusted Publishing
 
-### 1. 获取 NPM Token
-
-```bash
-# 登录 NPM
-npm login
-
-# 生成 automation token
-npm token create --type=automation
-```
-
-### 2. 添加到 GitHub Secrets
-
-1. 进入 GitHub 仓库设置
-2. 选择 "Secrets and variables" → "Actions"
-3. 点击 "New repository secret"
-4. 名称: `NPM_TOKEN`
-5. 值: 粘贴你的 NPM token
-6. 点击 "Add secret"
+1. 打开 npm 包页面：`@linhey/react-debug-inspector`
+2. 进入 `Settings` → `Publishing access` / `Trusted publishing`
+3. 添加 GitHub 仓库：`linhay/react-debug-inspector`
+4. 绑定工作流：`.github/workflows/publish.yml`
+5. 发布时由 GitHub OIDC 签发短期凭证，无需 `NPM_TOKEN`
 
 ---
 
@@ -167,7 +155,7 @@ npm pack --dry-run
 - [ ] README.md 文档是最新的
 - [ ] 版本号符合语义化版本规范
 - [ ] 没有未提交的更改
-- [ ] NPM_TOKEN 已配置
+- [ ] npm Trusted Publisher 已配置
 
 ---
 
@@ -176,7 +164,7 @@ npm pack --dry-run
 ### 问题：NPM 发布失败
 
 **解决方案:**
-1. 检查 NPM_TOKEN 是否正确配置
+1. 检查 npm Trusted Publisher 绑定是否正确
 2. 确认 NPM 账号有发布权限
 3. 检查包名是否已被占用
 4. 查看 Actions 日志获取详细错误信息

@@ -19,4 +19,13 @@ describe('NPM 发布工作流配置', () => {
     expect(workflow).toContain('workflows: ["Version Bump and Release"]');
     expect(workflow).toContain('types: [completed]');
   });
+
+  it('应使用 Trusted Publishing（不依赖 NPM_TOKEN）', () => {
+    const workflow = read('.github/workflows/publish.yml');
+
+    expect(workflow).toContain('id-token: write');
+    expect(workflow).toContain('npm publish --provenance --access public');
+    expect(workflow).not.toContain('NODE_AUTH_TOKEN');
+    expect(workflow).not.toContain('secrets.NPM_TOKEN');
+  });
 });
