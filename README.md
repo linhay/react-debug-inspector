@@ -9,8 +9,11 @@
 
 ## 🎬 演示
 
-<!-- TODO: 添加演示 GIF -->
-<!-- ![基本使用演示](./assets/demo-basic.gif) -->
+### 在线演示
+
+🌐 **[在线体验 Demo](https://你的用户名.github.io/react-debug-inspector/)**
+
+> 部署后将自动更新链接
 
 ### 快速预览
 
@@ -18,6 +21,9 @@
 2. 鼠标悬停在任何元素上查看调试信息
 3. 点击元素复制完整的调试标识
 4. 按 `Esc` 键退出检查模式
+
+<!-- TODO: 添加演示 GIF -->
+<!-- ![基本使用演示](./assets/demo-basic.gif) -->
 
 > 📹 查看 [录制指南](./RECORDING_GUIDE.md) 了解如何制作演示视频
 
