@@ -49,7 +49,7 @@ describe('react-debug-inspector runtime', () => {
     expect(button.style.top).toBe(draggedTop);
   });
 
-  it('should attach toggle button into dialog while dialog is visible', async () => {
+  it('should keep toggle button on body while dialog is visible', async () => {
     initInspector();
     const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
     expect(button).not.toBeNull();
@@ -60,7 +60,7 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(dialog);
     await waitNextFrame();
 
-    expect(button.parentElement).toBe(dialog);
+    expect(button.parentElement).toBe(document.body);
   });
 
   it('should ignore aria-hidden dialog hosts', async () => {
@@ -79,7 +79,66 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(visibleDialog);
     await waitNextFrame();
 
-    expect(button.parentElement).toBe(visibleDialog);
+    expect(button.parentElement).toBe(document.body);
+  });
+
+  it('should remain visible when dialog has transform host', async () => {
+    initInspector();
+    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    if (!button) return;
+
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    dialog.style.transform = 'translate(-50%, -50%)';
+    dialog.style.overflow = 'hidden';
+    document.body.appendChild(dialog);
+    await waitNextFrame();
+
+    expect(button.parentElement).toBe(document.body);
+    expect(button.style.left).toBe('24px');
+    expect(button.style.right).toBe('');
+  });
+
+  it('should move toggle button into radix dialog node when dialog is visible', async () => {
+    initInspector();
+    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    if (!button) return;
+
+    const portalHost = document.createElement('div');
+    portalHost.setAttribute('data-radix-portal', '');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    portalHost.appendChild(dialog);
+    document.body.appendChild(portalHost);
+    await waitNextFrame();
+
+    expect(button.parentElement).toBe(dialog);
+  });
+
+  it('should clear hidden and inert flags from toggle button while dialog is visible', async () => {
+    initInspector();
+    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    if (!button) return;
+
+    button.setAttribute('aria-hidden', 'true');
+    button.setAttribute('data-aria-hidden', 'true');
+    button.setAttribute('inert', '');
+
+    const portalHost = document.createElement('div');
+    portalHost.setAttribute('data-radix-portal', '');
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    portalHost.appendChild(dialog);
+    document.body.appendChild(portalHost);
+    await waitNextFrame();
+
+    expect(button.getAttribute('aria-hidden')).toBeNull();
+    expect(button.getAttribute('data-aria-hidden')).toBeNull();
+    expect(button.hasAttribute('inert')).toBe(false);
+    expect(button.style.pointerEvents).toBe('auto');
   });
 
   it('should avoid bottom-right when that area is obstructed', async () => {
@@ -112,5 +171,41 @@ describe('react-debug-inspector runtime', () => {
         delete document.elementsFromPoint;
       }
     }
+  });
+
+  it('should shield toggle button click from document bubble listeners', () => {
+    initInspector();
+    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    if (!button) return;
+
+    let documentBubbleClicks = 0;
+    const bubbleListener = () => {
+      documentBubbleClicks += 1;
+    };
+    document.addEventListener('click', bubbleListener, false);
+
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+
+    document.removeEventListener('click', bubbleListener, false);
+    expect(documentBubbleClicks).toBe(0);
+  });
+
+  it('should shield toggle button mousedown from document bubble listeners', () => {
+    initInspector();
+    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    if (!button) return;
+
+    let documentBubbleDown = 0;
+    const bubbleListener = () => {
+      documentBubbleDown += 1;
+    };
+    document.addEventListener('mousedown', bubbleListener, false);
+
+    button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+    document.removeEventListener('mousedown', bubbleListener, false);
+    expect(documentBubbleDown).toBe(0);
   });
 });

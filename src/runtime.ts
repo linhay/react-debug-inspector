@@ -68,10 +68,30 @@ export function initInspector() {
     });
   };
 
+  const getPreferredHost = (dialogs: HTMLElement[]) => {
+    if (dialogs.length === 0) return document.body;
+    const topDialog = dialogs[dialogs.length - 1];
+    const portalHost = topDialog.closest<HTMLElement>('[data-radix-portal]');
+    if (portalHost) return topDialog;
+    return document.body;
+  };
+
   const ensureToggleHost = (host: HTMLElement) => {
     if (toggleBtn.parentElement !== host) {
       host.appendChild(toggleBtn);
     }
+  };
+
+  const ensureToggleVisible = () => {
+    // Some dialog libraries mark outside nodes as hidden/inert.
+    // Ensure the inspector trigger always remains interactive.
+    toggleBtn.removeAttribute('aria-hidden');
+    toggleBtn.removeAttribute('data-aria-hidden');
+    toggleBtn.removeAttribute('inert');
+    if ('inert' in toggleBtn) {
+      (toggleBtn as HTMLButtonElement & { inert?: boolean }).inert = false;
+    }
+    toggleBtn.style.pointerEvents = 'auto';
   };
 
   const isIgnorableObstacle = (el: Element) => {
@@ -135,12 +155,12 @@ export function initInspector() {
   const updateAnchorForDialogs = () => {
     if (typeof document === 'undefined') return;
     const dialogs = getVisibleDialogs();
+    ensureToggleHost(getPreferredHost(dialogs));
+    ensureToggleVisible();
     if (dialogs.length > 0) {
-      ensureToggleHost(dialogs[dialogs.length - 1]);
       pickBestAnchor(true);
       return;
     }
-    ensureToggleHost(document.body);
     pickBestAnchor(false);
   };
 
@@ -199,9 +219,15 @@ export function initInspector() {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['style', 'class', 'open', 'aria-hidden'],
+    attributeFilter: ['style', 'class', 'open', 'aria-hidden', 'data-aria-hidden', 'inert'],
   });
-  window.addEventListener('beforeunload', () => dialogObserver.disconnect(), { once: true });
+  window.addEventListener(
+    'beforeunload',
+    () => {
+      dialogObserver.disconnect();
+    },
+    { once: true },
+  );
   window.addEventListener('resize', scheduleAnchorUpdate);
   window.addEventListener('scroll', scheduleAnchorUpdate, true);
   updateAnchorForDialogs();
@@ -237,6 +263,14 @@ export function initInspector() {
     window.removeEventListener('mouseup', onPointerUp);
   };
 
+  // Prevent dialog outside-click handlers from receiving toggle pointer/click events.
+  const stopTogglePropagation = (event: Event) => {
+    event.stopPropagation();
+  };
+  const shieldedEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'];
+  for (const eventName of shieldedEvents) {
+    toggleBtn.addEventListener(eventName, stopTogglePropagation);
+  }
   toggleBtn.addEventListener('mousedown', (e) => {
     const rect = toggleBtn.getBoundingClientRect();
     isDragging = true;
@@ -250,6 +284,7 @@ export function initInspector() {
   });
 
   toggleBtn.onclick = (e) => {
+    e.stopPropagation();
     if (pointerMoved) {
       e.preventDefault();
       e.stopPropagation();
