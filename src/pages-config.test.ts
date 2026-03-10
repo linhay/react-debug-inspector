@@ -52,6 +52,17 @@ describe('GitHub Pages 配置与文档', () => {
     expect(pagesDoc).toContain('## 常见问题与排障');
   });
 
+  it('Pages 文档应提供 agent-browser 测试案例', () => {
+    const browserCases = read('pages/AGENT_BROWSER_CASES.md');
+
+    expect(browserCases).toContain('agent-browser open https://linhay.github.io/react-debug-inspector/');
+    expect(browserCases).toContain('agent-browser snapshot -i');
+    expect(browserCases).toContain('agent-browser click');
+    expect(browserCases).toContain('127.0.0.1:4173');
+    expect(browserCases).toContain('复制 ID');
+    expect(browserCases).toContain('全部复制');
+  });
+
   it('CI 工作流应使用 Node 20+（避免 Node 18 的 ESM 兼容失败）', () => {
     const ciWorkflow = read('.github/workflows/ci.yml');
 

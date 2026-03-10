@@ -5,6 +5,7 @@
 - 线上地址：`https://linhay.github.io/react-debug-inspector/`
 - 工作流文件：`.github/workflows/deploy-pages.yml`
 - 演示项目目录：`test-app/`
+- 浏览器自动化案例：`pages/AGENT_BROWSER_CASES.md`
 
 ## 快速开始
 

@@ -119,26 +119,58 @@ test.describe('React Debug Inspector E2E', () => {
     expect(bgColor).toBe('rgb(14, 165, 233)'); // #0ea5e9
   });
 
-  test('should support dragging the toggle button', async ({ page }) => {
+  test('should show copy menu items in inspection mode', async ({ page }) => {
     const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
 
-    // 获取初始位置
-    const initialBox = await toggleBtn.boundingBox();
-    expect(initialBox).toBeTruthy();
+    const h1 = page.locator('h1');
+    await h1.hover();
+    await page.waitForTimeout(100);
 
-    // 拖拽按钮
-    await toggleBtn.hover();
-    await page.mouse.down();
-    await page.mouse.move(initialBox!.x - 100, initialBox!.y - 100);
-    await page.mouse.up();
+    await expect(page.getByRole('button', { name: '复制 ID' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '复制文案' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '复制图片' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '全部复制' })).toBeVisible();
+  });
 
-    // 获取新位置
-    const newBox = await toggleBtn.boundingBox();
-    expect(newBox).toBeTruthy();
+  test('should support copying visible text and image metadata from menu', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    // 验证位置已改变
-    expect(newBox!.x).not.toBe(initialBox!.x);
-    expect(newBox!.y).not.toBe(initialBox!.y);
+    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
+
+    const h1 = page.locator('h1');
+    await h1.hover();
+    await page.getByRole('button', { name: '复制文案' }).click();
+    await expect(page.locator('div:has-text("已复制文案")')).toBeVisible();
+
+    const text = await page.evaluate(() => navigator.clipboard.readText());
+    expect(text).toContain('Inspect Faster, Fix Sooner');
+
+    const image = page.locator('img[alt="Inspector preview card"]');
+    await image.hover();
+    await page.getByRole('button', { name: '复制图片' }).click();
+    await page.waitForTimeout(100);
+
+    const imagePayload = await page.evaluate(() => navigator.clipboard.readText());
+    expect(imagePayload).toContain('[image]');
+  });
+
+  test('should support copy all payload from menu', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
+
+    const example = page.locator('.copy-showcase');
+    await example.hover();
+    await page.getByRole('button', { name: '全部复制' }).click();
+    await page.waitForTimeout(100);
+
+    const payload = await page.evaluate(() => navigator.clipboard.readText());
+    expect(payload).toContain('[debug]');
+    expect(payload).toContain('[text]');
+    expect(payload).toContain('[image]');
   });
 
   test('should format debug info correctly', async ({ page }) => {

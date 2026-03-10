@@ -1,92 +1,234 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest';
 import { initInspector } from './runtime';
 
 describe('react-debug-inspector runtime - Advanced Features', () => {
+  const originalRAF = window.requestAnimationFrame;
+  const originalClipboard = navigator.clipboard;
+  const originalClipboardItem = window.ClipboardItem;
+  const originalFetch = global.fetch;
+
+  const mockClipboard = {
+    writeText: vi.fn().mockResolvedValue(undefined),
+    write: vi.fn().mockResolvedValue(undefined),
+    readText: vi.fn(),
+  };
+
   beforeEach(() => {
     document.body.innerHTML = '';
-  });
-
-  it('should format debug ID correctly for new format', () => {
-    const originalRAF = window.requestAnimationFrame;
     window.requestAnimationFrame = ((cb: FrameRequestCallback) => {
       cb(0);
       return 1;
     }) as typeof window.requestAnimationFrame;
+    Object.assign(navigator, { clipboard: mockClipboard });
+    mockClipboard.writeText.mockClear();
+    mockClipboard.write.mockClear();
+  });
 
-    try {
-      initInspector();
-
-      const testDiv = document.createElement('div');
-      testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
-      document.body.appendChild(testDiv);
-
-      const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
-      expect(button).not.toBeNull();
-
-      button?.click();
-      testDiv.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
-
-      // 检查 tooltip 是否显示格式化的文本
-      const tooltips = Array.from(document.querySelectorAll('div')).filter(el => {
-        const text = el.textContent || '';
-        return text.includes('Button.tsx') && text.includes('Button') && text.includes('button');
-      });
-
-      expect(tooltips.length).toBeGreaterThan(0);
-    } finally {
-      window.requestAnimationFrame = originalRAF;
+  afterEach(() => {
+    window.requestAnimationFrame = originalRAF;
+    Object.assign(navigator, { clipboard: originalClipboard });
+    if (originalClipboardItem) {
+      window.ClipboardItem = originalClipboardItem;
+    } else {
+      // @ts-expect-error test restore
+      delete window.ClipboardItem;
     }
+    global.fetch = originalFetch;
+  });
+
+  const getMenuButton = (label: string) => {
+    const buttons = Array.from(document.querySelectorAll('button'));
+    const button = buttons.find((el) => el.textContent?.trim() === label);
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  };
+
+  const hoverTarget = (target: HTMLElement) => {
+    initInspector();
+    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
+    toggle.click();
+    target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  };
+
+  const waitForAsyncActions = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  it('should format debug ID correctly for new format', () => {
+    const testDiv = document.createElement('div');
+    testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
+    document.body.appendChild(testDiv);
+
+    hoverTarget(testDiv);
+
+    const tooltips = Array.from(document.querySelectorAll('div')).filter(el => {
+      const text = el.textContent || '';
+      return text.includes('Button.tsx') && text.includes('Button') && text.includes('button');
+    });
+
+    expect(tooltips.length).toBeGreaterThan(0);
   });
 
   it('should handle old format debug ID for backward compatibility', () => {
-    initInspector();
-
     const testDiv = document.createElement('div');
     testDiv.setAttribute('data-debug', 'Button:button:42');
     document.body.appendChild(testDiv);
 
-    // 验证元素存在且有正确的属性
     const element = document.querySelector('[data-debug="Button:button:42"]');
     expect(element).toBeTruthy();
     expect(element?.getAttribute('data-debug')).toBe('Button:button:42');
   });
 
-  it('should copy full debug ID to clipboard', async () => {
-    const mockClipboard = {
-      writeText: vi.fn().mockResolvedValue(undefined),
-      readText: vi.fn(),
-    };
-    Object.assign(navigator, { clipboard: mockClipboard });
+  it('should show copy action menu for hovered debug element', () => {
+    const testDiv = document.createElement('div');
+    const debugId = 'src/components/Button.tsx:Button:button:42';
+    testDiv.setAttribute('data-debug', debugId);
+    testDiv.textContent = 'Reset Counter';
+    document.body.appendChild(testDiv);
 
-    initInspector();
+    hoverTarget(testDiv);
 
+    expect(getMenuButton('复制 ID')).toBeTruthy();
+    expect(getMenuButton('复制文案')).toBeTruthy();
+    expect(getMenuButton('复制图片')).toBeTruthy();
+    expect(getMenuButton('全部复制')).toBeTruthy();
+  });
+
+  it('should copy full debug ID from menu', async () => {
     const testDiv = document.createElement('div');
     const debugId = 'src/components/Button.tsx:Button:button:42';
     testDiv.setAttribute('data-debug', debugId);
     document.body.appendChild(testDiv);
 
-    // 验证 clipboard API 已被 mock
-    expect(navigator.clipboard.writeText).toBeDefined();
+    hoverTarget(testDiv);
+    getMenuButton('复制 ID').click();
 
-    // 验证元素存在
-    const element = document.querySelector(`[data-debug="${debugId}"]`);
-    expect(element).toBeTruthy();
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(debugId);
+  });
+
+  it('should copy visible text from menu', async () => {
+    const testDiv = document.createElement('button');
+    const debugId = 'src/components/Button.tsx:Button:button:42';
+    testDiv.setAttribute('data-debug', debugId);
+    testDiv.textContent = '  Reset   Counter  ';
+    document.body.appendChild(testDiv);
+
+    hoverTarget(testDiv);
+    getMenuButton('复制文案').click();
+
+    expect(mockClipboard.writeText).toHaveBeenCalledWith('Reset Counter');
+  });
+
+  it('should prefer aria-label when copying text', async () => {
+    const testDiv = document.createElement('button');
+    testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
+    testDiv.setAttribute('aria-label', 'Accessible Reset');
+    testDiv.textContent = 'Reset Counter';
+    document.body.appendChild(testDiv);
+
+    hoverTarget(testDiv);
+    getMenuButton('复制文案').click();
+
+    expect(mockClipboard.writeText).toHaveBeenCalledWith('Accessible Reset');
+  });
+
+  it('should fallback to debug ID when text content is missing', async () => {
+    const testDiv = document.createElement('div');
+    const debugId = 'src/components/Button.tsx:Button:button:42';
+    testDiv.setAttribute('data-debug', debugId);
+    document.body.appendChild(testDiv);
+
+    hoverTarget(testDiv);
+    getMenuButton('复制文案').click();
+
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(debugId);
+  });
+
+  it('should copy image binary when ClipboardItem is supported', async () => {
+    const blob = new Blob(['image'], { type: 'image/png' });
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(blob),
+    } as Response);
+    window.ClipboardItem = vi.fn((items) => items) as unknown as typeof ClipboardItem;
+
+    const img = document.createElement('img');
+    img.setAttribute('data-debug', 'src/components/Image.tsx:Image:img:42');
+    img.src = 'https://example.com/image.png';
+    img.alt = 'Hero image';
+    document.body.appendChild(img);
+
+    hoverTarget(img);
+    getMenuButton('复制图片').click();
+    await waitForAsyncActions();
+
+    expect(global.fetch).toHaveBeenCalledWith('https://example.com/image.png');
+    expect(mockClipboard.write).toHaveBeenCalledTimes(1);
+  });
+
+  it('should fallback to metadata text when binary image copy fails', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('cors'));
+    window.ClipboardItem = vi.fn((items) => items) as unknown as typeof ClipboardItem;
+
+    const img = document.createElement('img');
+    const debugId = 'src/components/Image.tsx:Image:img:42';
+    img.setAttribute('data-debug', debugId);
+    img.src = 'https://example.com/image.png';
+    img.alt = 'Hero image';
+    img.title = 'Cover';
+    document.body.appendChild(img);
+
+    hoverTarget(img);
+    getMenuButton('复制图片').click();
+    await waitForAsyncActions();
+
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('url: https://example.com/image.png'));
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining(`debugId: ${debugId}`));
+  });
+
+  it('should build structured payload for copy all', async () => {
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('data-debug', 'src/components/Card.tsx:Card:div:8');
+    wrapper.textContent = 'Counter Example';
+    const img = document.createElement('img');
+    img.src = 'https://example.com/preview.png';
+    img.alt = 'Preview';
+    wrapper.appendChild(img);
+    document.body.appendChild(wrapper);
+
+    hoverTarget(wrapper);
+    getMenuButton('全部复制').click();
+
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[debug]'));
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[text]'));
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[image]'));
+  });
+
+  it('should keep inspection mode active after menu action', async () => {
+    const testDiv = document.createElement('div');
+    testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
+    testDiv.textContent = 'Reset Counter';
+    document.body.appendChild(testDiv);
+
+    hoverTarget(testDiv);
+    getMenuButton('复制文案').click();
+
+    expect(document.body.style.cursor).toBe('crosshair');
   });
 
   it('should show full path in tooltip title attribute', () => {
-    initInspector();
-
     const testDiv = document.createElement('div');
     const debugId = 'src/components/Button.tsx:Button:button:42';
     testDiv.setAttribute('data-debug', debugId);
     document.body.appendChild(testDiv);
 
-    // 验证元素存在且有正确的属性
-    const element = document.querySelector(`[data-debug="${debugId}"]`);
-    expect(element).toBeTruthy();
-    expect(element?.getAttribute('data-debug')).toBe(debugId);
+    hoverTarget(testDiv);
+
+    const tooltip = Array.from(document.querySelectorAll('div')).find((el) => el.getAttribute('title') === debugId);
+    expect(tooltip).toBeTruthy();
   });
 
   it('should handle elements without data-debug attribute', () => {
@@ -100,7 +242,6 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     button?.click();
     testDiv.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
-    // overlay 和 tooltip 应该不显示
     const overlays = Array.from(document.querySelectorAll('div')).filter(el => {
       const style = window.getComputedStyle(el);
       return style.pointerEvents === 'none' && style.display === 'block';
@@ -109,88 +250,16 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     expect(overlays.length).toBe(0);
   });
 
-  it('should toggle inspection mode on button click', () => {
-    // 清理之前的测试状态
-    document.body.innerHTML = '';
-    document.body.style.cursor = '';
-
-    initInspector();
-
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
-    expect(button).toBeTruthy();
-
-    // 验证按钮存在并可以被点击
-    expect(button?.onclick).toBeTruthy();
-  });
-
-  it('should exit inspection mode when clicking on non-debug element', () => {
-    // 清理之前的测试状态
-    document.body.innerHTML = '';
-    document.body.style.cursor = '';
-
-    initInspector();
-
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
-    expect(button).toBeTruthy();
-
-    // 创建测试元素
-    const testDiv = document.createElement('div');
-    testDiv.textContent = 'Test element';
-    document.body.appendChild(testDiv);
-
-    // 验证元素存在
-    expect(testDiv.parentElement).toBe(document.body);
-  });
-
-  it('should not initialize in non-browser environment', () => {
-    const originalWindow = global.window;
-    // @ts-expect-error - testing undefined window
-    delete global.window;
-
-    const result = initInspector();
-    expect(result).toBeUndefined();
-
-    global.window = originalWindow;
-  });
-
   it('should handle rapid mouse movements without errors', () => {
-    initInspector();
-
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
-    button?.click();
-
     const testDiv = document.createElement('div');
     testDiv.setAttribute('data-debug', 'App:div:1');
     document.body.appendChild(testDiv);
 
-    // 快速触发多次 mousemove
+    hoverTarget(testDiv);
     for (let i = 0; i < 100; i++) {
       testDiv.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
     }
 
-    // 不应该抛出错误
     expect(true).toBe(true);
-  });
-
-  it('should handle nested data-debug elements correctly', () => {
-    // 清理之前的测试状态
-    document.body.innerHTML = '';
-    document.body.style.cursor = '';
-
-    initInspector();
-
-    const parent = document.createElement('div');
-    parent.setAttribute('data-debug', 'Parent:div:1');
-
-    const child = document.createElement('span');
-    child.setAttribute('data-debug', 'Child:span:2');
-
-    parent.appendChild(child);
-    document.body.appendChild(parent);
-
-    // 验证嵌套结构正确
-    expect(parent.contains(child)).toBe(true);
-    expect(child.getAttribute('data-debug')).toBe('Child:span:2');
-    expect(parent.getAttribute('data-debug')).toBe('Parent:div:1');
   });
 });

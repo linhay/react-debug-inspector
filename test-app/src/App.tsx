@@ -1,6 +1,31 @@
 import { useState } from 'react';
 import './App.css';
 
+const previewImage =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(`
+    <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0ea5e9" />
+          <stop offset="100%" stop-color="#ff8a3d" />
+        </linearGradient>
+      </defs>
+      <rect width="640" height="360" rx="28" fill="url(#bg)" />
+      <rect x="44" y="42" width="220" height="18" rx="9" fill="rgba(255,255,255,0.55)" />
+      <rect x="44" y="82" width="332" height="52" rx="16" fill="rgba(255,255,255,0.9)" />
+      <rect x="44" y="156" width="552" height="130" rx="24" fill="rgba(15,23,42,0.18)" />
+      <circle cx="546" cy="102" r="42" fill="rgba(255,255,255,0.78)" />
+      <path d="M530 102h32M546 86v32" stroke="#0f2940" stroke-width="8" stroke-linecap="round" />
+      <text x="44" y="116" fill="#0f2940" font-size="28" font-family="Avenir Next, Arial, sans-serif" font-weight="700">
+        Copy UI context directly
+      </text>
+      <text x="44" y="204" fill="#ffffff" font-size="24" font-family="Avenir Next, Arial, sans-serif">
+        debug id + text + image metadata
+      </text>
+    </svg>
+  `);
+
 function App() {
   const [count, setCount] = useState(0);
   const [showDialog, setShowDialog] = useState(false);
@@ -60,6 +85,28 @@ function App() {
                 'Works with nested and dynamic elements',
               ]}
             />
+          </section>
+
+          <section className="section section-wide copy-showcase">
+            <div className="copy-showcase-copy">
+              <p className="copy-showcase-kicker">Copy Showcase</p>
+              <h2>Capture the exact text or image your teammate is asking about</h2>
+              <p className="copy-showcase-text">
+                This sentence is intentionally descriptive so you can verify the “复制文案” action copies meaningful
+                business text instead of only debug metadata.
+              </p>
+              <p className="copy-showcase-note">
+                Hover this card in inspection mode, then try “复制文案 / 复制图片 / 全部复制”.
+              </p>
+            </div>
+            <div className="copy-showcase-media">
+              <img
+                src={previewImage}
+                alt="Inspector preview card"
+                title="Inspector preview"
+                className="preview-image"
+              />
+            </div>
           </section>
         </div>
       </main>

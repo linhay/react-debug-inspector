@@ -22,6 +22,7 @@
 - `README.md` 与 `pages/GITHUB_PAGES.md` 必须指向真实 URL
 - 禁止保留占位链接 `你的用户名`
 - `pages/GITHUB_PAGES.md` 必须包含：快速开始、部署验证、排障章节
+- `pages/AGENT_BROWSER_CASES.md` 必须存在，并包含 `agent-browser` 的线上与本地案例
 
 ## 执行方式
 ```bash
