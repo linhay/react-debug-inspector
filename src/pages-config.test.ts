@@ -51,4 +51,11 @@ describe('GitHub Pages 配置与文档', () => {
     expect(pagesDoc).toContain('## 部署验证');
     expect(pagesDoc).toContain('## 常见问题与排障');
   });
+
+  it('CI 工作流应使用 Node 20+（避免 Node 18 的 ESM 兼容失败）', () => {
+    const ciWorkflow = read('.github/workflows/ci.yml');
+
+    expect(ciWorkflow).toContain('node-version: [20.x');
+    expect(ciWorkflow).not.toContain('18.x');
+  });
 });
