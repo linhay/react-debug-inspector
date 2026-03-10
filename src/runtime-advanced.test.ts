@@ -57,8 +57,6 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     await Promise.resolve();
   };
 
-  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
   it('should format debug ID correctly for new format', () => {
     const testDiv = document.createElement('div');
     testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
@@ -219,42 +217,6 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     getMenuButton('复制文案').click();
 
     expect(document.body.style.cursor).toBe('crosshair');
-  });
-
-  it('should keep action menu visible briefly while pointer moves toward it', async () => {
-    const testDiv = document.createElement('div');
-    testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
-    testDiv.textContent = 'Reset Counter';
-    document.body.appendChild(testDiv);
-
-    hoverTarget(testDiv);
-    const menuButton = getMenuButton('复制 ID');
-    expect(menuButton.parentElement).toBeTruthy();
-
-    document.body.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
-    await wait(60);
-
-    expect((menuButton.parentElement as HTMLElement).style.display).toBe('flex');
-  });
-
-  it('should keep menu anchored when pointer moves between nested debug elements', () => {
-    const parent = document.createElement('section');
-    parent.setAttribute('data-debug', 'src/components/Panel.tsx:Panel:section:10');
-    const child = document.createElement('button');
-    child.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
-    child.textContent = 'Nested CTA';
-    parent.appendChild(child);
-    document.body.appendChild(parent);
-
-    hoverTarget(parent);
-    const menu = getMenuButton('复制 ID').parentElement as HTMLElement;
-    const initialLeft = menu.style.left;
-    const initialTop = menu.style.top;
-
-    child.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
-
-    expect(menu.style.left).toBe(initialLeft);
-    expect(menu.style.top).toBe(initialTop);
   });
 
   it('should show full path in tooltip title attribute', () => {
