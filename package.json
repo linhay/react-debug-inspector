@@ -1,6 +1,6 @@
 {
   "name": "@linhey/react-debug-inspector",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A developer tool to inspect React components in browser and jump to source code.",
   "author": "linhey",
   "license": "MIT",
@@ -12,13 +12,30 @@
   ],
   "scripts": {
     "dev": "tsup src/index.ts --format cjs,esm --watch --dts",
+    "dev:test-app": "vite --config vite.config.test.ts",
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:all": "npm run test && npm run test:e2e",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.3.5",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "jsdom": "^26.1.0",
+    "playwright": "^1.58.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "tsup": "^8.0.2",
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.2",
+    "vite": "^7.3.1",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "react": ">=16.8.0"
