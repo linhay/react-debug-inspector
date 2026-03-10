@@ -25,11 +25,12 @@ jobs:
         with:
           node-version: '20.x'
           cache: 'npm'
+          cache-dependency-path: 'test-app/package-lock.json'
 
       - name: Install dependencies
         run: |
           cd test-app
-          npm install
+          npm ci
 
       - name: Build demo app
         run: |

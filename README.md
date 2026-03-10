@@ -12,9 +12,9 @@
 
 ### 在线演示
 
-🌐 **[在线体验 Demo](https://你的用户名.github.io/react-debug-inspector/)**
+🌐 **[在线体验 Demo](https://linhay.github.io/react-debug-inspector/)**
 
-> 部署后将自动更新链接
+> GitHub Pages 配置说明见 [GITHUB_PAGES.md](./GITHUB_PAGES.md)
 
 ### 快速预览
 
