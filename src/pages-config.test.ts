@@ -58,4 +58,12 @@ describe('GitHub Pages 配置与文档', () => {
     expect(ciWorkflow).toContain('node-version: [20.x');
     expect(ciWorkflow).not.toContain('18.x');
   });
+
+  it('Demo 页面应提供跳回 GitHub 的入口', () => {
+    const appSource = read('test-app/src/App.tsx');
+
+    expect(appSource).toContain('返回 GitHub');
+    expect(appSource).toContain('https://github.com/linhay/react-debug-inspector');
+    expect(appSource).toContain('target="_blank"');
+  });
 });

@@ -41,6 +41,23 @@ body {
   opacity: 0.9;
 }
 
+.github-link {
+  display: inline-block;
+  margin-top: 16px;
+  color: #ffffff;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 8px 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.github-link:hover {
+  background: #ffffff;
+  color: #5568d3;
+}
+
 .main {
   padding: 40px;
 }

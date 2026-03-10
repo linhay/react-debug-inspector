@@ -7,6 +7,7 @@
 - GitHub Actions Pages 工作流配置正确。
 - Pages 文档包含可执行的使用说明与验证步骤。
 - README 演示地址为真实可访问地址。
+- Demo 页面提供可见且可点击的 GitHub 仓库返回入口。
 
 ## 场景 1：工作流可稳定发布
 - **Given** 仓库使用 `.github/workflows/deploy-pages.yml` 发布 Pages
@@ -27,3 +28,9 @@
 - **When** 点击在线演示链接
 - **Then** 跳转到真实 GitHub Pages URL
 - **And** 文档中不应出现占位地址（如 `你的用户名`）
+
+## 场景 4：Demo 页支持跳回 GitHub
+- **Given** 用户正在 GitHub Pages Demo 页面浏览示例
+- **When** 需要回到仓库查看源码或提 Issue
+- **Then** 页面应提供可见的“返回 GitHub”链接
+- **And** 链接应指向仓库主页 `https://github.com/linhay/react-debug-inspector`

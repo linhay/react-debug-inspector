@@ -10,6 +10,14 @@ function App() {
       <header className="header">
         <h1>React Debug Inspector Demo</h1>
         <p>Try clicking the 🎯 button in the corner to inspect elements!</p>
+        <a
+          className="github-link"
+          href="https://github.com/linhay/react-debug-inspector"
+          target="_blank"
+          rel="noreferrer"
+        >
+          返回 GitHub
+        </a>
       </header>
 
       <main className="main">
