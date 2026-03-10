@@ -34,7 +34,7 @@ describe('GitHub Pages 配置与文档', () => {
 
   it('README 与 Pages 指南应使用真实演示地址，且不含占位链接', () => {
     const readme = read('README.md');
-    const pagesDoc = read('GITHUB_PAGES.md');
+    const pagesDoc = read('pages/GITHUB_PAGES.md');
 
     const realUrl = 'https://linhay.github.io/react-debug-inspector/';
 
@@ -45,7 +45,7 @@ describe('GitHub Pages 配置与文档', () => {
   });
 
   it('Pages 使用说明应覆盖部署、验证与排障', () => {
-    const pagesDoc = read('GITHUB_PAGES.md');
+    const pagesDoc = read('pages/GITHUB_PAGES.md');
 
     expect(pagesDoc).toContain('## 快速开始');
     expect(pagesDoc).toContain('## 部署验证');

@@ -14,7 +14,7 @@
 
 🌐 **[在线体验 Demo](https://linhay.github.io/react-debug-inspector/)**
 
-> GitHub Pages 配置说明见 [GITHUB_PAGES.md](./GITHUB_PAGES.md)
+> GitHub Pages 配置说明见 [GITHUB_PAGES.md](./pages/GITHUB_PAGES.md)
 
 ### 快速预览
 

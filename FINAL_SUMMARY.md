@@ -28,7 +28,7 @@
 - ✅ README.md（含徽章和演示链接）
 - ✅ CHANGELOG.md
 - ✅ GITHUB_ACTIONS.md
-- ✅ GITHUB_PAGES.md
+- ✅ pages/GITHUB_PAGES.md
 - ✅ QUICK_START.md
 - ✅ RELEASE_CHECKLIST.md
 - ✅ RECORDING_GUIDE.md
@@ -120,7 +120,7 @@ npm token create --type=automation
 
 ### 开发文档
 - 🔄 [GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md) - CI/CD 说明
-- 🌐 [GITHUB_PAGES.md](./GITHUB_PAGES.md) - Pages 配置
+- 🌐 [GITHUB_PAGES.md](./pages/GITHUB_PAGES.md) - Pages 配置
 - ✅ [RELEASE_CHECKLIST.md](./RELEASE_CHECKLIST.md) - 发布检查清单
 
 ### 资源指南
@@ -194,5 +194,5 @@ npm token create --type=automation
 
 **下一步**: 启用 GitHub Pages 并配置 NPM Token，即可发布！
 
-查看 [GITHUB_PAGES.md](./GITHUB_PAGES.md) 了解如何启用演示网站。
+查看 [GITHUB_PAGES.md](./pages/GITHUB_PAGES.md) 了解如何启用演示网站。
 查看 [GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md) 了解如何发布到 NPM。
