@@ -24,8 +24,9 @@ describe('NPM 发布工作流配置', () => {
     const workflow = read('.github/workflows/publish.yml');
 
     expect(workflow).toContain('id-token: write');
+    expect(workflow).toContain('npm install -g npm@^11');
+    expect(workflow).toContain('unset NODE_AUTH_TOKEN');
     expect(workflow).toContain('npm publish --provenance --access public');
-    expect(workflow).not.toContain('NODE_AUTH_TOKEN');
     expect(workflow).not.toContain('secrets.NPM_TOKEN');
   });
 });
