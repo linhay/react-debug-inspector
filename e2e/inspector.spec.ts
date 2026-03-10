@@ -169,13 +169,15 @@ test.describe('React Debug Inspector E2E', () => {
   });
 
   test('should handle nested components correctly', async ({ page }) => {
-    // 检查 Card 组件内的元素
-    const cardH2 = page.locator('.card h2');
-    const h2Debug = await cardH2.getAttribute('data-debug');
-    expect(h2Debug).toContain('App.tsx:Card:h2');
+    // 检查 Card 组件内标题元素
+    const cardTitle = page.locator('.card h3', { hasText: 'Counter' });
+    await expect(cardTitle).toBeVisible();
+    const titleDebug = await cardTitle.getAttribute('data-debug');
+    expect(titleDebug).toContain('App.tsx:Card:h3');
 
-    // 检查 Button 组件的元素
-    const resetButton = page.locator('.reset-button');
+    // 检查 Button 组件（重置按钮）
+    const resetButton = page.getByRole('button', { name: 'Reset Counter' });
+    await expect(resetButton).toBeVisible();
     const buttonDebug = await resetButton.getAttribute('data-debug');
     expect(buttonDebug).toContain('App.tsx:Button:button');
   });
