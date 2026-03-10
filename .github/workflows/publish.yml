@@ -1,11 +1,19 @@
 name: Publish to NPM
 
 on:
+  workflow_dispatch:
   release:
     types: [created]
+  workflow_run:
+    workflows: ["Version Bump and Release"]
+    types: [completed]
 
 jobs:
   publish:
+    if: |
+      github.event_name == 'release' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
 
     permissions:
