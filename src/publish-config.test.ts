@@ -11,6 +11,15 @@ const read = (relativePath: string) =>
   fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
 
 describe('NPM 发布工作流配置', () => {
+  it('包元数据应声明与 provenance 一致的仓库地址', () => {
+    const pkg = JSON.parse(read('package.json')) as {
+      repository?: { type?: string; url?: string };
+    };
+
+    expect(pkg.repository?.type).toBe('git');
+    expect(pkg.repository?.url).toBe('https://github.com/linhay/react-debug-inspector');
+  });
+
   it('应支持手动触发与 release 后续触发', () => {
     const workflow = read('.github/workflows/publish.yml');
 
