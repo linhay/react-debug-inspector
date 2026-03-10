@@ -25,28 +25,25 @@ describe('react-debug-inspector runtime', () => {
     expect(button.style.right).toBe('');
   });
 
-  it('should keep user dragged position when dialog is visible', async () => {
+  it('should not move toggle button when pointer moves after mousedown', () => {
     initInspector();
     const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
     expect(button).not.toBeNull();
     if (!button) return;
 
+    const initialLeft = button.style.left;
+    const initialTop = button.style.top;
+    const initialRight = button.style.right;
+    const initialBottom = button.style.bottom;
+
     button.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: 30, clientY: 30 }));
     window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 200, clientY: 160 }));
     window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: 200, clientY: 160 }));
 
-    const draggedLeft = button.style.left;
-    const draggedTop = button.style.top;
-    expect(draggedLeft).not.toBe('');
-    expect(draggedTop).not.toBe('');
-
-    const dialog = document.createElement('div');
-    dialog.setAttribute('role', 'dialog');
-    document.body.appendChild(dialog);
-    await waitNextFrame();
-
-    expect(button.style.left).toBe(draggedLeft);
-    expect(button.style.top).toBe(draggedTop);
+    expect(button.style.left).toBe(initialLeft);
+    expect(button.style.top).toBe(initialTop);
+    expect(button.style.right).toBe(initialRight);
+    expect(button.style.bottom).toBe(initialBottom);
   });
 
   it('should keep toggle button on body while dialog is visible', async () => {

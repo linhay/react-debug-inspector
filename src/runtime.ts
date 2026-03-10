@@ -5,13 +5,6 @@ export function initInspector() {
   if (typeof window === 'undefined') return;
 
   let isInspecting = false;
-  let hasUserPosition = false;
-  let isDragging = false;
-  let pointerMoved = false;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
-  let dragStartX = 0;
-  let dragStartY = 0;
   let overlay: HTMLDivElement | null = null;
   let tooltip: HTMLDivElement | null = null;
   const edgeOffset = 24;
@@ -43,7 +36,6 @@ export function initInspector() {
   document.body.appendChild(toggleBtn);
 
   const applyAnchor = (anchor: Anchor) => {
-    if (hasUserPosition) return;
     toggleBtn.style.top = anchor.startsWith('top') ? `${edgeOffset}px` : '';
     toggleBtn.style.bottom = anchor.startsWith('bottom') ? `${edgeOffset}px` : '';
     if (anchor.endsWith('left')) {
@@ -241,28 +233,6 @@ export function initInspector() {
     tooltip.style.display = 'none';
   };
 
-  const onPointerMove = (e: MouseEvent) => {
-    if (!isDragging) return;
-    const deltaX = Math.abs(e.clientX - dragStartX);
-    const deltaY = Math.abs(e.clientY - dragStartY);
-    if (deltaX > 3 || deltaY > 3) {
-      pointerMoved = true;
-    }
-    const left = Math.max(8, Math.min(window.innerWidth - 52, e.clientX - dragOffsetX));
-    const top = Math.max(8, Math.min(window.innerHeight - 52, e.clientY - dragOffsetY));
-    toggleBtn.style.left = `${left}px`;
-    toggleBtn.style.top = `${top}px`;
-    toggleBtn.style.right = '';
-    toggleBtn.style.bottom = '';
-    hasUserPosition = true;
-  };
-
-  const onPointerUp = () => {
-    isDragging = false;
-    window.removeEventListener('mousemove', onPointerMove);
-    window.removeEventListener('mouseup', onPointerUp);
-  };
-
   // Prevent dialog outside-click handlers from receiving toggle pointer/click events.
   const stopTogglePropagation = (event: Event) => {
     event.stopPropagation();
@@ -271,26 +241,9 @@ export function initInspector() {
   for (const eventName of shieldedEvents) {
     toggleBtn.addEventListener(eventName, stopTogglePropagation);
   }
-  toggleBtn.addEventListener('mousedown', (e) => {
-    const rect = toggleBtn.getBoundingClientRect();
-    isDragging = true;
-    pointerMoved = false;
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-    dragOffsetX = e.clientX - rect.left;
-    dragOffsetY = e.clientY - rect.top;
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('mouseup', onPointerUp);
-  });
 
   toggleBtn.onclick = (e) => {
     e.stopPropagation();
-    if (pointerMoved) {
-      e.preventDefault();
-      e.stopPropagation();
-      pointerMoved = false;
-      return;
-    }
     isInspecting = !isInspecting;
     if (isInspecting) {
       toggleBtn.style.transform = 'scale(0.9)';
