@@ -32,6 +32,8 @@ export function initInspector() {
   let latestHoverEvent: MouseEvent | null = null;
   let pendingHoverFrame = false;
   let anchorUpdatePending = false;
+  let hideMenuTimer: number | null = null;
+  let isPointerInsideMenu = false;
   const edgeOffset = 24;
   const successColor = '#10b981';
   const defaultOverlayBg = 'rgba(14, 165, 233, 0.15)';
@@ -339,9 +341,9 @@ export function initInspector() {
     const menuHeight = actionMenu.offsetHeight || 40;
     const tooltipRect = tooltip.getBoundingClientRect();
 
-    let left = tooltipRect.right + 8;
+    let left = tooltipRect.right + 2;
     if (left + menuWidth > win.innerWidth - 8) {
-      left = Math.max(8, tooltipRect.left - menuWidth - 8);
+      left = Math.max(8, tooltipRect.left - menuWidth - 2);
     }
 
     let top = tooltipRect.top;
@@ -358,12 +360,32 @@ export function initInspector() {
 
   const showActionMenu = (context: InspectContext) => {
     if (!actionMenu) return;
+    if (hideMenuTimer !== null) {
+      win.clearTimeout(hideMenuTimer);
+      hideMenuTimer = null;
+    }
     actionMenu.style.display = 'flex';
     positionActionMenu(context);
   };
 
+  const scheduleHideActionMenu = () => {
+    if (!actionMenu || isPointerInsideMenu) return;
+    if (hideMenuTimer !== null) {
+      win.clearTimeout(hideMenuTimer);
+    }
+    hideMenuTimer = win.setTimeout(() => {
+      if (isPointerInsideMenu) return;
+      actionMenu.style.display = 'none';
+      hideMenuTimer = null;
+    }, 180);
+  };
+
   const hideActionMenu = () => {
     if (!actionMenu) return;
+    if (hideMenuTimer !== null) {
+      win.clearTimeout(hideMenuTimer);
+      hideMenuTimer = null;
+    }
     actionMenu.style.display = 'none';
   };
 
@@ -429,6 +451,9 @@ export function initInspector() {
     const target = event.target as HTMLElement | null;
     if (!target) return;
     if (target === toggleBtn || target === overlay || target === tooltip || target.closest('[data-inspector-ignore="true"]')) {
+      if (latestContext) {
+        showActionMenu(latestContext);
+      }
       return;
     }
 
@@ -438,12 +463,19 @@ export function initInspector() {
       return;
     }
 
+    if (
+      debugEl &&
+      latestContext &&
+      (latestContext.debugEl.contains(debugEl) || debugEl.contains(latestContext.debugEl))
+    ) {
+      showActionMenu(latestContext);
+      return;
+    }
+
     if (!debugEl) {
       overlay.style.display = 'none';
       tooltip.style.display = 'none';
-      hideActionMenu();
-      latestContext = null;
-      lastHoveredDebugEl = null;
+      scheduleHideActionMenu();
       return;
     }
 
@@ -530,6 +562,17 @@ export function initInspector() {
     border: 1px solid rgba(148, 163, 184, 0.25);
     align-items: center;
   `;
+  actionMenu.addEventListener('mouseenter', () => {
+    isPointerInsideMenu = true;
+    if (hideMenuTimer !== null) {
+      win.clearTimeout(hideMenuTimer);
+      hideMenuTimer = null;
+    }
+  });
+  actionMenu.addEventListener('mouseleave', () => {
+    isPointerInsideMenu = false;
+    scheduleHideActionMenu();
+  });
   const actionDefinitions: Array<{ action: 'id' | 'text' | 'image' | 'all'; label: string }> = [
     { action: 'id', label: '复制 ID' },
     { action: 'text', label: '复制文案' },
@@ -609,6 +652,8 @@ export function initInspector() {
 
     const debugEl = target.closest('[data-debug]') as HTMLElement | null;
     if (!debugEl) {
+      latestContext = null;
+      lastHoveredDebugEl = null;
       stopInspecting();
       return;
     }
@@ -651,6 +696,10 @@ export function initInspector() {
     doc.removeEventListener('mousemove', handleMouseMove);
     win.removeEventListener('click', handleWindowClick, { capture: true });
     win.removeEventListener('keydown', handleKeyDown);
+    if (hideMenuTimer !== null) {
+      win.clearTimeout(hideMenuTimer);
+      hideMenuTimer = null;
+    }
     for (const eventName of shieldedEvents) {
       toggleBtn.removeEventListener(eventName, stopTogglePropagation);
     }
