@@ -45,3 +45,7 @@ lerna-debug.log*
 
 # NPM package
 *.tgz
+
+# Local reference projects (keep index file only)
+references/*
+!references/README.md
