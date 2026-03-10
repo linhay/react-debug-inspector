@@ -144,19 +144,23 @@ export function initInspector() {
     pickBestAnchor(false);
   };
 
+  let anchorUpdatePending = false;
+  const scheduleAnchorUpdate = () => {
+    if (typeof window === 'undefined') return;
+    if (anchorUpdatePending) return;
+    anchorUpdatePending = true;
+    const schedule = typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame.bind(window)
+      : (cb: FrameRequestCallback) => window.setTimeout(() => cb(Date.now()), 16);
+    schedule(() => {
+      anchorUpdatePending = false;
+      updateAnchorForDialogs();
+    });
+  };
+
   const dialogObserver = new MutationObserver(() => {
-    updateAnchorForDialogs();
+    scheduleAnchorUpdate();
   });
-  dialogObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['style', 'class', 'open', 'aria-hidden'],
-  });
-  window.addEventListener('beforeunload', () => dialogObserver.disconnect(), { once: true });
-  window.addEventListener('resize', updateAnchorForDialogs);
-  window.addEventListener('scroll', updateAnchorForDialogs, true);
-  updateAnchorForDialogs();
 
   // 2. 创建高亮遮罩
   overlay = document.createElement('div');
@@ -191,6 +195,16 @@ export function initInspector() {
     cursor: help;
   `;
   document.body.appendChild(tooltip);
+  dialogObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class', 'open', 'aria-hidden'],
+  });
+  window.addEventListener('beforeunload', () => dialogObserver.disconnect(), { once: true });
+  window.addEventListener('resize', scheduleAnchorUpdate);
+  window.addEventListener('scroll', scheduleAnchorUpdate, true);
+  updateAnchorForDialogs();
 
   const stopInspecting = () => {
     isInspecting = false;
@@ -266,12 +280,13 @@ export function initInspector() {
     return debugId.replace(/:/g, ' › ');
   };
 
-  window.addEventListener('mousemove', (e) => {
+  const inspectByPointer = (e: MouseEvent) => {
     if (!isInspecting) return;
     const target = e.target as HTMLElement;
     if (target === toggleBtn || target === overlay || target === tooltip) return;
 
     const debugEl = target.closest('[data-debug]') as HTMLElement;
+    if (debugEl && debugEl === lastHoveredDebugEl) return;
     if (debugEl) {
       const debugId = debugEl.getAttribute('data-debug') || '';
       const rect = debugEl.getBoundingClientRect();
@@ -290,10 +305,30 @@ export function initInspector() {
       const tooltipY = rect.top < 30 ? rect.bottom + 4 : rect.top - 28;
       tooltip.style.top = tooltipY + 'px';
       tooltip.style.left = rect.left + 'px';
+      lastHoveredDebugEl = debugEl;
     } else {
       overlay.style.display = 'none';
       tooltip.style.display = 'none';
+      lastHoveredDebugEl = null;
     }
+  };
+
+  let pendingHoverFrame = false;
+  let latestHoverEvent: MouseEvent | null = null;
+  let lastHoveredDebugEl: HTMLElement | null = null;
+  document.addEventListener('mousemove', (e) => {
+    if (!isInspecting) return;
+    latestHoverEvent = e;
+    if (pendingHoverFrame) return;
+    pendingHoverFrame = true;
+    const schedule = typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame.bind(window)
+      : (cb: FrameRequestCallback) => window.setTimeout(() => cb(Date.now()), 16);
+    schedule(() => {
+      pendingHoverFrame = false;
+      if (!latestHoverEvent) return;
+      inspectByPointer(latestHoverEvent);
+    });
   });
 
   window.addEventListener(

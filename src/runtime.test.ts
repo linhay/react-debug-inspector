@@ -4,6 +4,8 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { initInspector } from './runtime';
 
 describe('react-debug-inspector runtime', () => {
+  const waitNextFrame = () => new Promise((resolve) => setTimeout(resolve, 20));
+
   beforeEach(() => {
     document.body.innerHTML = '';
   });
@@ -17,7 +19,7 @@ describe('react-debug-inspector runtime', () => {
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
     document.body.appendChild(dialog);
-    await Promise.resolve();
+    await waitNextFrame();
 
     expect(button.style.left).toBe('24px');
     expect(button.style.right).toBe('');
@@ -41,7 +43,7 @@ describe('react-debug-inspector runtime', () => {
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
     document.body.appendChild(dialog);
-    await Promise.resolve();
+    await waitNextFrame();
 
     expect(button.style.left).toBe(draggedLeft);
     expect(button.style.top).toBe(draggedTop);
@@ -56,7 +58,7 @@ describe('react-debug-inspector runtime', () => {
     const dialog = document.createElement('div');
     dialog.setAttribute('role', 'dialog');
     document.body.appendChild(dialog);
-    await Promise.resolve();
+    await waitNextFrame();
 
     expect(button.parentElement).toBe(dialog);
   });
@@ -75,7 +77,7 @@ describe('react-debug-inspector runtime', () => {
     const visibleDialog = document.createElement('div');
     visibleDialog.setAttribute('role', 'dialog');
     document.body.appendChild(visibleDialog);
-    await Promise.resolve();
+    await waitNextFrame();
 
     expect(button.parentElement).toBe(visibleDialog);
   });
@@ -86,11 +88,12 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(obstruction);
 
     const original = document.elementsFromPoint;
-    document.elementsFromPoint = ((x: number, y: number) => {
-      if (x > window.innerWidth - 120 && y > window.innerHeight - 120) {
+    document.elementsFromPoint = (() => {
+      const btn = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+      if (btn?.style.right === '24px' && btn?.style.bottom === '24px') {
         return [obstruction, document.body];
       }
-      if (typeof original === 'function') return original.call(document, x, y);
+      if (typeof original === 'function') return original.call(document, 0, 0);
       return [document.body];
     }) as typeof document.elementsFromPoint;
 

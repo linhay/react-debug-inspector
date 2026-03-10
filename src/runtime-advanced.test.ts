@@ -9,25 +9,35 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
   });
 
   it('should format debug ID correctly for new format', () => {
-    initInspector();
+    const originalRAF = window.requestAnimationFrame;
+    window.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    }) as typeof window.requestAnimationFrame;
 
-    const testDiv = document.createElement('div');
-    testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
-    document.body.appendChild(testDiv);
+    try {
+      initInspector();
 
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
-    expect(button).not.toBeNull();
+      const testDiv = document.createElement('div');
+      testDiv.setAttribute('data-debug', 'src/components/Button.tsx:Button:button:42');
+      document.body.appendChild(testDiv);
 
-    button?.click();
-    testDiv.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+      const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
+      expect(button).not.toBeNull();
 
-    // 检查 tooltip 是否显示格式化的文本
-    const tooltips = Array.from(document.querySelectorAll('div')).filter(el => {
-      const text = el.textContent || '';
-      return text.includes('Button.tsx') && text.includes('Button') && text.includes('button');
-    });
+      button?.click();
+      testDiv.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
-    expect(tooltips.length).toBeGreaterThan(0);
+      // 检查 tooltip 是否显示格式化的文本
+      const tooltips = Array.from(document.querySelectorAll('div')).filter(el => {
+        const text = el.textContent || '';
+        return text.includes('Button.tsx') && text.includes('Button') && text.includes('button');
+      });
+
+      expect(tooltips.length).toBeGreaterThan(0);
+    } finally {
+      window.requestAnimationFrame = originalRAF;
+    }
   });
 
   it('should handle old format debug ID for backward compatibility', () => {
