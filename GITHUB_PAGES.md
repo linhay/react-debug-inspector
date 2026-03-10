@@ -1,200 +1,109 @@
-# GitHub Pages 配置指南
+# GitHub Pages 使用说明
 
-本项目配置了 GitHub Pages 自动部署，用于展示在线演示。
+本仓库使用 GitHub Actions 自动发布演示站点。
 
-## 🌐 演示地址
+- 线上地址：`https://linhay.github.io/react-debug-inspector/`
+- 工作流文件：`.github/workflows/deploy-pages.yml`
+- 演示项目目录：`test-app/`
 
-部署后访问：`https://你的用户名.github.io/react-debug-inspector/`
+## 快速开始
 
-## 📋 配置步骤
+### 1. 启用 Pages（只需一次）
 
-### 1. 启用 GitHub Pages
+1. 进入仓库 `Settings` -> `Pages`
+2. 在 `Build and deployment` 中选择 `Source: GitHub Actions`
+3. 保存配置
 
-1. 进入 GitHub 仓库
-2. 点击 **Settings** → **Pages**
-3. 在 **Source** 下选择：
-   - Source: **GitHub Actions**
-4. 保存设置
-
-### 2. 推送代码
+### 2. 本地验证构建
 
 ```bash
-git add .
-git commit -m "feat: add GitHub Pages demo site"
-git push
-```
-
-### 3. 等待部署
-
-- 推送后会自动触发 GitHub Actions
-- 进入 **Actions** 页面查看部署进度
-- 部署成功后，访问演示地址
-
-## 🔧 工作流说明
-
-### 触发条件
-
-- 推送到 `main` 分支
-- 手动触发（workflow_dispatch）
-
-### 部署流程
-
-1. **构建阶段**
-   - 安装依赖
-   - 构建 test-app
-   - 上传构建产物
-
-2. **部署阶段**
-   - 部署到 GitHub Pages
-   - 更新演示网站
-
-## 📁 项目结构
-
-```
-test-app/
-├── src/
-│   ├── App.tsx          # 演示应用
-│   ├── App.css          # 样式文件
-│   └── main.tsx         # 入口文件
-├── index.html           # HTML 模板
-├── package.json         # 依赖配置
-├── vite.config.ts       # Vite 配置
-└── tsconfig.json        # TypeScript 配置
-```
-
-## 🎨 演示功能
-
-演示网站包含以下功能展示：
-
-1. **计数器示例**
-   - 展示基本的状态管理
-   - 演示按钮点击交互
-
-2. **对话框示例**
-   - 展示 🎯 按钮的智能避障
-   - 演示弹窗场景
-
-3. **列表示例**
-   - 展示列表渲染
-   - 演示多个元素的调试
-
-## 🔄 更新演示
-
-每次推送到 `main` 分支时，演示网站会自动更新。
-
-### 手动触发部署
-
-1. 进入 **Actions** 页面
-2. 选择 **Deploy to GitHub Pages** 工作流
-3. 点击 **Run workflow**
-4. 选择 `main` 分支
-5. 点击 **Run workflow** 按钮
-
-## 🐛 故障排查
-
-### 问题：部署失败
-
-**检查项：**
-1. GitHub Pages 是否已启用
-2. 工作流权限是否正确
-3. 查看 Actions 日志获取详细错误
-
-**解决方案：**
-```bash
-# 本地测试构建
 cd test-app
-npm install
+npm ci
 npm run build
-
-# 检查构建产物
-ls -la dist/
 ```
 
-### 问题：页面显示 404
+构建成功后应生成 `test-app/dist/`。
 
-**原因：**
-- base 路径配置不正确
+### 3. 触发部署
 
-**解决方案：**
-检查 `test-app/vite.config.ts` 中的 `base` 配置：
-```typescript
-export default defineConfig({
-  base: '/react-debug-inspector/', // 必须与仓库名一致
-  // ...
-});
+- 自动触发：推送到 `main`
+- 手动触发：`Actions` -> `Deploy to GitHub Pages` -> `Run workflow`
+
+## 部署验证
+
+部署完成后执行以下检查：
+
+1. Actions 页面中 `Deploy to GitHub Pages` 为 `success`
+2. 访问 `https://linhay.github.io/react-debug-inspector/` 返回 200
+3. 页面资源正常加载（无明显 404）
+4. Demo 页面可看到右下角 `🎯` 按钮
+
+可用命令行快速验证：
+
+```bash
+curl -I -L https://linhay.github.io/react-debug-inspector/
 ```
 
-### 问题：样式或资源加载失败
+期望包含 `HTTP/2 200`（或等价 200 状态）。
 
-**原因：**
-- 资源路径不正确
+## 工作流说明
 
-**解决方案：**
-确保所有资源使用相对路径或正确的 base 路径。
+`deploy-pages.yml` 关键阶段：
 
-## 📝 自定义演示
+1. `build`
+- 使用 Node 20
+- 基于 `test-app/package-lock.json` 缓存依赖
+- 在 `test-app` 执行 `npm ci` 和 `npm run build`
+- 上传 `test-app/dist` 作为 Pages artifact
 
-### 修改演示内容
+2. `deploy`
+- 使用 `actions/deploy-pages@v4` 发布 artifact
+- 通过 `environment: github-pages` 暴露站点 URL
 
-编辑 `test-app/src/App.tsx`：
+## 常见问题与排障
 
-```typescript
-function App() {
-  return (
-    <div className="app">
-      {/* 添加你的演示内容 */}
-    </div>
-  );
-}
-```
+### 问题 1：`actions/configure-pages` 报 404
 
-### 修改样式
+原因：仓库未启用 Pages 或 Source 不是 `GitHub Actions`。
 
-编辑 `test-app/src/App.css`：
+处理：
+1. 到 `Settings -> Pages` 检查 Source
+2. 修正后重新运行 `Deploy to GitHub Pages`
 
-```css
-.app {
-  /* 自定义样式 */
-}
-```
+### 问题 2：工作流安装失败
 
-### 本地预览
+原因：`test-app/package-lock.json` 与 `package.json` 不一致，导致 `npm ci` 失败。
+
+处理：
 
 ```bash
 cd test-app
 npm install
-npm run dev
+git add package-lock.json
 ```
 
-访问 `http://localhost:5173` 预览效果。
+提交后重新触发部署。
 
-## 🎯 最佳实践
+### 问题 3：页面 404 或资源路径错误
 
-1. **保持演示简洁**
-   - 只展示核心功能
-   - 避免过于复杂的示例
+原因：`test-app/vite.config.ts` 的 `base` 与仓库名不一致。
 
-2. **添加说明文字**
-   - 引导用户如何使用
-   - 解释每个功能的作用
+当前应为：
 
-3. **响应式设计**
-   - 确保在移动设备上也能正常显示
-   - 测试不同屏幕尺寸
+```ts
+base: '/react-debug-inspector/'
+```
 
-4. **性能优化**
-   - 压缩资源文件
-   - 使用代码分割
-   - 优化加载速度
+### 问题 4：页面已部署但内容没更新
 
-## 📚 相关资源
+原因：CDN 缓存。
 
-- [GitHub Pages 文档](https://docs.github.com/en/pages)
-- [Vite 部署指南](https://vitejs.dev/guide/static-deploy.html)
-- [GitHub Actions 文档](https://docs.github.com/en/actions)
+处理：
+1. 强制刷新浏览器（macOS: `Cmd+Shift+R`）
+2. 等待 1-3 分钟后再验证
 
-## 🎊 完成
+## 维护建议
 
-配置完成后，你的演示网站将自动部署到 GitHub Pages！
-
-访问 `https://你的用户名.github.io/react-debug-inspector/` 查看效果。
+1. 修改 `test-app` 依赖后，同步更新并提交 `test-app/package-lock.json`
+2. 每次合并到 `main` 后，检查最新一次 Pages workflow 结果
+3. 文档中的演示地址必须保持真实可访问，禁止占位链接
