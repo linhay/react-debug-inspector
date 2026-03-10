@@ -34,3 +34,9 @@
 - **When** 需要回到仓库查看源码或提 Issue
 - **Then** 页面应提供可见的“返回 GitHub”链接
 - **And** 链接应指向仓库主页 `https://github.com/linhay/react-debug-inspector`
+
+## 场景 5：Demo 页视觉重设计
+- **Given** 用户打开 GitHub Pages 演示页
+- **When** 浏览主视觉与示例区块
+- **Then** 页面应呈现新的 Hero 与分区化布局
+- **And** 保留原有交互能力（计数器、弹窗、列表示例与 GitHub 返回入口）

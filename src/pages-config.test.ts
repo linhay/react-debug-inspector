@@ -66,4 +66,15 @@ describe('GitHub Pages 配置与文档', () => {
     expect(appSource).toContain('https://github.com/linhay/react-debug-inspector');
     expect(appSource).toContain('target="_blank"');
   });
+
+  it('Demo 页面应采用新的 Hero 分区布局', () => {
+    const appSource = read('test-app/src/App.tsx');
+    const cssSource = read('test-app/src/App.css');
+
+    expect(appSource).toContain('hero-kicker');
+    expect(appSource).toContain('hero-title');
+    expect(appSource).toContain('feature-grid');
+    expect(cssSource).toContain('.hero-kicker');
+    expect(cssSource).toContain('.feature-grid');
+  });
 });
