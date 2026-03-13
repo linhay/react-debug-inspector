@@ -81,3 +81,10 @@
 - **When** 进入检查模式并查看示例区域
 - **Then** 页面中应存在可复制文案的文本示例
 - **And** 页面中应存在可复制图片的图片示例
+
+## 场景 9：Vite 8 环境应可稳定注入 data-debug
+- **Given** 项目使用 `vite@8` 与 `@vitejs/plugin-react@6`
+- **When** 接入官方提供的 Vite 插件工厂
+- **Then** 开发态（`vite dev`）中的 JSX 元素应被注入 `data-debug`
+- **And** 生产构建（`vite build`）不应注入 `data-debug`
+- **And** 运行时检查模式应能正常命中开发态页面元素

@@ -48,21 +48,31 @@ npm install @linhey/react-debug-inspector --save-dev
 
 ### 1. 配置 Vite (vite.config.ts)
 
+推荐在 Vite 8+ 使用官方导出的插件工厂，确保 `data-debug` 注入稳定：
+
 ```typescript
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import debugInspector from '@linhey/react-debug-inspector';
+import { createViteDebugInspectorPlugin } from '@linhey/react-debug-inspector';
 
 export default defineConfig({
   plugins: [
-    react({
-      babel: {
-        // 仅在开发环境下启用注入
-        plugins: process.env.NODE_ENV === 'development' ? [debugInspector] : []
-      }
-    }),
+    createViteDebugInspectorPlugin(),
+    react(),
   ],
 });
+```
+
+如果你仍在旧链路中使用 Babel 直接注入，也可以保留：
+
+```typescript
+import debugInspector from '@linhey/react-debug-inspector';
+
+react({
+  babel: {
+    plugins: [debugInspector],
+  }
+})
 ```
 
 ### 2. 初始化交互界面 (main.tsx)

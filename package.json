@@ -17,7 +17,7 @@
   "scripts": {
     "dev": "tsup src/index.ts --format cjs,esm --watch --dts",
     "dev:test-app": "vite --config vite.config.test.ts",
-    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --external @babel/core",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
@@ -25,8 +25,10 @@
     "test:all": "npm run test && npm run test:e2e",
     "prepublishOnly": "npm run build"
   },
+  "dependencies": {
+    "@babel/core": "^7.24.0"
+  },
   "devDependencies": {
-    "@babel/core": "^7.24.0",
     "@playwright/test": "^1.58.2",
     "@types/node": "^25.3.5",
     "@types/react": "^19.2.14",
