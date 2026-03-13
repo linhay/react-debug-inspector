@@ -123,8 +123,8 @@ test.describe('React Debug Inspector E2E', () => {
     const toggleBtn = page.locator('button[title="开启组件定位器"]');
     await toggleBtn.click();
 
-    const h1 = page.locator('h1');
-    await h1.hover();
+    const image = page.locator('img[alt="Inspector preview card"]');
+    await image.hover();
     await page.waitForTimeout(100);
 
     await expect(page.getByRole('button', { name: '复制 ID' })).toBeVisible();
@@ -162,8 +162,8 @@ test.describe('React Debug Inspector E2E', () => {
     const toggleBtn = page.locator('button[title="开启组件定位器"]');
     await toggleBtn.click();
 
-    const example = page.locator('.copy-showcase');
-    await example.hover();
+    const image = page.locator('img[alt="Inspector preview card"]');
+    await image.hover();
     await page.getByRole('button', { name: '全部复制' }).click();
     await page.waitForTimeout(100);
 

@@ -214,6 +214,16 @@ export function initInspector() {
     return `${value.slice(0, limit - 3)}...`;
   };
 
+  const suppressEvent = (event: Event, { preventDefault = false, immediate = false } = {}) => {
+    if (preventDefault) {
+      event.preventDefault();
+    }
+    event.stopPropagation();
+    if (immediate) {
+      event.stopImmediatePropagation?.();
+    }
+  };
+
   const extractTextContent = (target: HTMLElement) => {
     const ariaLabel = normalizeText(target.getAttribute('aria-label') || '');
     if (ariaLabel) return truncateText(ariaLabel);
@@ -566,8 +576,7 @@ export function initInspector() {
       white-space: nowrap;
     `;
     button.addEventListener('click', async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+      suppressEvent(event, { preventDefault: true });
       if (!latestContext) return;
       await performCopyAction(definition.action, latestContext);
     });
@@ -577,7 +586,7 @@ export function initInspector() {
   doc.body.appendChild(actionMenu);
 
   const stopTogglePropagation = (event: Event) => {
-    event.stopPropagation();
+    suppressEvent(event);
   };
   const shieldedEvents = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'touchstart', 'touchend'];
   for (const eventName of shieldedEvents) {
@@ -585,7 +594,7 @@ export function initInspector() {
   }
 
   const handleToggleClick = (event: MouseEvent) => {
-    event.stopPropagation();
+    suppressEvent(event);
     isInspecting = !isInspecting;
     if (isInspecting) {
       toggleBtn.style.transform = 'scale(0.9)';
@@ -617,8 +626,7 @@ export function initInspector() {
       return;
     }
 
-    event.preventDefault();
-    event.stopPropagation();
+    suppressEvent(event, { preventDefault: true, immediate: true });
 
     const debugEl = target.closest('[data-debug]') as HTMLElement | null;
     if (!debugEl) {
