@@ -146,6 +146,22 @@ test.describe('React Debug Inspector E2E', () => {
     await expect(page.getByText('Press state: idle')).toBeVisible();
   });
 
+  test('should not trigger pointer handlers while selecting an element', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
+
+    const pointerCard = page.locator('article.pointer-card');
+    await pointerCard.scrollIntoViewIfNeeded();
+    await pointerCard.click();
+    await page.waitForTimeout(200);
+
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toContain('App.tsx:App:article');
+    await expect(page.getByText('Pointer state: idle')).toBeVisible();
+  });
+
   test('should exit inspection mode on Escape key', async ({ page }) => {
     const toggleBtn = page.locator('button[title="开启组件定位器"]');
     await toggleBtn.click();

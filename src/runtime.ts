@@ -33,6 +33,7 @@ export function initInspector() {
   let latestHoverEvent: MouseEvent | null = null;
   let pendingHoverFrame = false;
   let anchorUpdatePending = false;
+  let selectionLocked = false;
   const edgeOffset = 24;
   const successColor = '#10b981';
   const defaultOverlayBg = 'rgba(14, 165, 233, 0.15)';
@@ -394,6 +395,35 @@ export function initInspector() {
     actionMenu.style.display = 'none';
   };
 
+  const finalizeSelection = (debugId: string) => {
+    selectionLocked = true;
+    copyText(debugId)
+      .then(() => {
+        showCopyFeedback('Copied!', 'success');
+        win.setTimeout(() => {
+          selectionLocked = false;
+          stopInspecting();
+        }, 600);
+      })
+      .catch(() => {
+        selectionLocked = false;
+      });
+  };
+
+  const selectDebugTarget = (target: HTMLElement | null) => {
+    if (selectionLocked) return;
+    const debugEl = target?.closest('[data-debug]') as HTMLElement | null;
+    if (!debugEl) {
+      selectionLocked = false;
+      stopInspecting();
+      return;
+    }
+
+    const debugId = debugEl.getAttribute('data-debug');
+    if (!debugId) return;
+    finalizeSelection(debugId);
+  };
+
   const copyText = async (value: string) => {
     await navigator.clipboard.writeText(value);
   };
@@ -497,6 +527,7 @@ export function initInspector() {
 
   const stopInspecting = () => {
     isInspecting = false;
+    selectionLocked = false;
     latestContext = null;
     lastHoveredDebugEl = null;
     toggleBtn.style.transform = 'scale(1)';
@@ -628,7 +659,19 @@ export function initInspector() {
     if (!isInspecting) return;
     const target = event.target as HTMLElement | null;
     if (!target || isInspectorChromeTarget(target)) return;
+    if (selectionLocked) {
+      suppressEvent(event, { preventDefault: true, immediate: true });
+      return;
+    }
+
+    const isTouchSelectionEvent =
+      event.type === 'touchend' ||
+      (event.type === 'pointerup' && 'pointerType' in event && (event as PointerEvent).pointerType !== 'mouse');
+
     suppressEvent(event, { preventDefault: true, immediate: true });
+    if (isTouchSelectionEvent) {
+      selectDebugTarget(target);
+    }
   };
 
   const handleWindowClick = (event: MouseEvent) => {
@@ -640,19 +683,10 @@ export function initInspector() {
     }
 
     suppressEvent(event, { preventDefault: true, immediate: true });
-
-    const debugEl = target.closest('[data-debug]') as HTMLElement | null;
-    if (!debugEl) {
-      stopInspecting();
+    if (selectionLocked) {
       return;
     }
-
-    const debugId = debugEl.getAttribute('data-debug');
-    if (!debugId) return;
-    copyText(debugId).then(() => {
-      showCopyFeedback('Copied!', 'success');
-      win.setTimeout(stopInspecting, 600);
-    });
+    selectDebugTarget(target);
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {

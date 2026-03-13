@@ -31,6 +31,7 @@ function App() {
   const [showDialog, setShowDialog] = useState(false);
   const [selectedCard, setSelectedCard] = useState('none');
   const [pressedCard, setPressedCard] = useState('idle');
+  const [pointerCard, setPointerCard] = useState('idle');
 
   return (
     <div className="app">
@@ -107,6 +108,16 @@ function App() {
               <p>Some apps start interactions on mouse down instead of click.</p>
             </article>
             <p className="section-intro">Press state: {pressedCard}</p>
+          </section>
+
+          <section className="section section-wide">
+            <h2>Pointer Card Example</h2>
+            <p className="section-intro">Selecting this card in inspect mode should not trigger pointer handlers on touch or pen flows.</p>
+            <article className="card pointer-card" onPointerDown={() => setPointerCard('pressed')}>
+              <h3>Pointer Down Card</h3>
+              <p>Some apps start interactions from pointer events before click is dispatched.</p>
+            </article>
+            <p className="section-intro">Pointer state: {pointerCard}</p>
           </section>
 
           <section className="section section-wide copy-showcase">
