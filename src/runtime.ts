@@ -33,6 +33,7 @@ export function initInspector() {
   let latestHoverEvent: MouseEvent | null = null;
   let pendingHoverFrame = false;
   let anchorUpdatePending = false;
+  let selectionLocked = false;
   const edgeOffset = 24;
   const successColor = '#10b981';
   const defaultOverlayBg = 'rgba(14, 165, 233, 0.15)';
@@ -224,6 +225,12 @@ export function initInspector() {
     }
   };
 
+  const isInspectorChromeTarget = (target: HTMLElement | null) => {
+    if (!target) return false;
+    if (target === toggleBtn || target === overlay || target === tooltip || target === actionMenu) return true;
+    return !!target.closest('[data-inspector-ignore="true"]');
+  };
+
   const extractTextContent = (target: HTMLElement) => {
     const ariaLabel = normalizeText(target.getAttribute('aria-label') || '');
     if (ariaLabel) return truncateText(ariaLabel);
@@ -388,6 +395,35 @@ export function initInspector() {
     actionMenu.style.display = 'none';
   };
 
+  const finalizeSelection = (debugId: string) => {
+    selectionLocked = true;
+    copyText(debugId)
+      .then(() => {
+        showCopyFeedback('Copied!', 'success');
+        win.setTimeout(() => {
+          selectionLocked = false;
+          stopInspecting();
+        }, 600);
+      })
+      .catch(() => {
+        selectionLocked = false;
+      });
+  };
+
+  const selectDebugTarget = (target: HTMLElement | null) => {
+    if (selectionLocked) return;
+    const debugEl = target?.closest('[data-debug]') as HTMLElement | null;
+    if (!debugEl) {
+      selectionLocked = false;
+      stopInspecting();
+      return;
+    }
+
+    const debugId = debugEl.getAttribute('data-debug');
+    if (!debugId) return;
+    finalizeSelection(debugId);
+  };
+
   const copyText = async (value: string) => {
     await navigator.clipboard.writeText(value);
   };
@@ -450,7 +486,7 @@ export function initInspector() {
     if (!isInspecting || !overlay || !tooltip) return;
     const target = event.target as HTMLElement | null;
     if (!target) return;
-    if (target === toggleBtn || target === overlay || target === tooltip || target.closest('[data-inspector-ignore="true"]')) {
+    if (isInspectorChromeTarget(target)) {
       return;
     }
 
@@ -491,6 +527,7 @@ export function initInspector() {
 
   const stopInspecting = () => {
     isInspecting = false;
+    selectionLocked = false;
     latestContext = null;
     lastHoveredDebugEl = null;
     toggleBtn.style.transform = 'scale(1)';
@@ -618,28 +655,38 @@ export function initInspector() {
     });
   };
 
+  const handlePointerSuppression = (event: Event) => {
+    if (!isInspecting) return;
+    const target = event.target as HTMLElement | null;
+    if (!target || isInspectorChromeTarget(target)) return;
+    if (selectionLocked) {
+      suppressEvent(event, { preventDefault: true, immediate: true });
+      return;
+    }
+
+    const isTouchSelectionEvent =
+      event.type === 'touchend' ||
+      (event.type === 'pointerup' && 'pointerType' in event && (event as PointerEvent).pointerType !== 'mouse');
+
+    suppressEvent(event, { preventDefault: true, immediate: true });
+    if (isTouchSelectionEvent) {
+      selectDebugTarget(target);
+    }
+  };
+
   const handleWindowClick = (event: MouseEvent) => {
     if (!isInspecting) return;
     const target = event.target as HTMLElement | null;
     if (!target || target === toggleBtn) return;
-    if (target.closest('[data-inspector-ignore="true"]')) {
+    if (isInspectorChromeTarget(target)) {
       return;
     }
 
     suppressEvent(event, { preventDefault: true, immediate: true });
-
-    const debugEl = target.closest('[data-debug]') as HTMLElement | null;
-    if (!debugEl) {
-      stopInspecting();
+    if (selectionLocked) {
       return;
     }
-
-    const debugId = debugEl.getAttribute('data-debug');
-    if (!debugId) return;
-    copyText(debugId).then(() => {
-      showCopyFeedback('Copied!', 'success');
-      win.setTimeout(stopInspecting, 600);
-    });
+    selectDebugTarget(target);
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -660,6 +707,12 @@ export function initInspector() {
   win.addEventListener('resize', scheduleAnchorUpdate);
   win.addEventListener('scroll', scheduleAnchorUpdate, true);
   doc.addEventListener('mousemove', handleMouseMove);
+  win.addEventListener('pointerdown', handlePointerSuppression, { capture: true });
+  win.addEventListener('pointerup', handlePointerSuppression, { capture: true });
+  win.addEventListener('mousedown', handlePointerSuppression, { capture: true });
+  win.addEventListener('mouseup', handlePointerSuppression, { capture: true });
+  win.addEventListener('touchstart', handlePointerSuppression, { capture: true });
+  win.addEventListener('touchend', handlePointerSuppression, { capture: true });
   win.addEventListener('click', handleWindowClick, { capture: true });
   win.addEventListener('keydown', handleKeyDown);
   updateAnchorForDialogs();
@@ -670,6 +723,12 @@ export function initInspector() {
     win.removeEventListener('resize', scheduleAnchorUpdate);
     win.removeEventListener('scroll', scheduleAnchorUpdate, true);
     doc.removeEventListener('mousemove', handleMouseMove);
+    win.removeEventListener('pointerdown', handlePointerSuppression, { capture: true });
+    win.removeEventListener('pointerup', handlePointerSuppression, { capture: true });
+    win.removeEventListener('mousedown', handlePointerSuppression, { capture: true });
+    win.removeEventListener('mouseup', handlePointerSuppression, { capture: true });
+    win.removeEventListener('touchstart', handlePointerSuppression, { capture: true });
+    win.removeEventListener('touchend', handlePointerSuppression, { capture: true });
     win.removeEventListener('click', handleWindowClick, { capture: true });
     win.removeEventListener('keydown', handleKeyDown);
     for (const eventName of shieldedEvents) {

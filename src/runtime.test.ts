@@ -239,4 +239,111 @@ describe('react-debug-inspector runtime', () => {
       window.removeEventListener('click', laterCaptureListener, { capture: true });
     }
   });
+
+  it('should stop later window mousedown capture listeners while selecting a debug target', () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async () => undefined,
+      },
+    });
+
+    const target = document.createElement('article');
+    target.setAttribute('data-debug', 'src/pages/DetailCard.tsx:DetailCard:article:12');
+    target.textContent = 'Open details';
+    document.body.appendChild(target);
+
+    initInspector();
+    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+
+    let laterCaptureMouseDowns = 0;
+    const laterCaptureListener = () => {
+      laterCaptureMouseDowns += 1;
+    };
+    window.addEventListener('mousedown', laterCaptureListener, { capture: true });
+
+    try {
+      toggle.click();
+      laterCaptureMouseDowns = 0;
+      target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+      expect(laterCaptureMouseDowns).toBe(0);
+    } finally {
+      window.removeEventListener('mousedown', laterCaptureListener, { capture: true });
+    }
+  });
+
+  it('should stop later window pointerdown capture listeners while selecting a debug target', () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async () => undefined,
+      },
+    });
+
+    const target = document.createElement('article');
+    target.setAttribute('data-debug', 'src/pages/DetailCard.tsx:DetailCard:article:12');
+    target.textContent = 'Open details';
+    document.body.appendChild(target);
+
+    initInspector();
+    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+
+    let laterCapturePointerDowns = 0;
+    const laterCaptureListener = () => {
+      laterCapturePointerDowns += 1;
+    };
+    window.addEventListener('pointerdown', laterCaptureListener, { capture: true });
+
+    try {
+      toggle.click();
+      laterCapturePointerDowns = 0;
+      target.dispatchEvent(new Event('pointerdown', { bubbles: true, cancelable: true }));
+
+      expect(laterCapturePointerDowns).toBe(0);
+    } finally {
+      window.removeEventListener('pointerdown', laterCaptureListener, { capture: true });
+    }
+  });
+
+  it('should copy debug id on touchend selection without waiting for click', async () => {
+    const writeText = async () => undefined;
+    const clipboard = { writeText };
+    Object.assign(navigator, { clipboard });
+
+    const writeSpyCalls: string[] = [];
+    clipboard.writeText = async (value: string) => {
+      writeSpyCalls.push(value);
+    };
+
+    const target = document.createElement('article');
+    const debugId = 'src/pages/DetailCard.tsx:DetailCard:article:12';
+    target.setAttribute('data-debug', debugId);
+    target.textContent = 'Open details';
+    document.body.appendChild(target);
+
+    initInspector();
+    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+
+    let laterCaptureTouchEnds = 0;
+    const laterCaptureListener = () => {
+      laterCaptureTouchEnds += 1;
+    };
+    window.addEventListener('touchend', laterCaptureListener, { capture: true });
+
+    try {
+      toggle.click();
+      laterCaptureTouchEnds = 0;
+      target.dispatchEvent(new Event('touchend', { bubbles: true, cancelable: true }));
+
+      expect(laterCaptureTouchEnds).toBe(0);
+      expect(writeSpyCalls).toContain(debugId);
+    } finally {
+      window.removeEventListener('touchend', laterCaptureListener, { capture: true });
+    }
+  });
 });
