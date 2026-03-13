@@ -65,8 +65,16 @@ describe('GitHub Pages 配置与文档', () => {
 
   it('CI 工作流应使用 Node 20+（避免 Node 18 的 ESM 兼容失败）', () => {
     const ciWorkflow = read('.github/workflows/ci.yml');
+    const match = ciWorkflow.match(/node-version:\s*\[([^\]]+)\]/);
+    const versions = (match?.[1] ?? '')
+      .split(',')
+      .map((item) => item.trim().replace(/['"]/g, ''))
+      .filter(Boolean)
+      .map((item) => Number.parseInt(item, 10))
+      .filter((item) => Number.isFinite(item));
 
-    expect(ciWorkflow).toContain('node-version: [20.x');
+    expect(versions.length).toBeGreaterThan(0);
+    expect(versions.every((item) => item >= 20)).toBe(true);
     expect(ciWorkflow).not.toContain('18.x');
   });
 
