@@ -5,6 +5,7 @@ describe('vite debug inspector plugin', () => {
   it('should expose a pre-transform plugin', () => {
     const plugin = createViteDebugInspectorPlugin();
     expect(plugin.name).toBe('react-debug-inspector-transform');
+    expect(plugin.apply).toBe('serve');
     expect(plugin.enforce).toBe('pre');
     expect(typeof plugin.transform).toBe('function');
   });

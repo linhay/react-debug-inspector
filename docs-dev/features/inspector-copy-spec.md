@@ -78,5 +78,6 @@
 ## 场景 9：Vite 8 环境应可稳定注入 data-debug
 - **Given** 项目使用 `vite@8` 与 `@vitejs/plugin-react@6`
 - **When** 接入官方提供的 Vite 插件工厂
-- **Then** 构建产物中的 JSX 元素应被注入 `data-debug`
-- **And** 运行时检查模式应能正常命中页面元素
+- **Then** 开发态（`vite dev`）中的 JSX 元素应被注入 `data-debug`
+- **And** 生产构建（`vite build`）不应注入 `data-debug`
+- **And** 运行时检查模式应能正常命中开发态页面元素

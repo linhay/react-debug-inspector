@@ -7,6 +7,7 @@ type TransformResult = {
 
 type ViteCompatiblePlugin = {
   name: string;
+  apply: 'serve';
   enforce: 'pre';
   transform: (code: string, id: string) => Promise<TransformResult | null>;
 };
@@ -14,6 +15,7 @@ type ViteCompatiblePlugin = {
 export function createViteDebugInspectorPlugin(): ViteCompatiblePlugin {
   return {
     name: 'react-debug-inspector-transform',
+    apply: 'serve',
     enforce: 'pre',
     async transform(code: string, id: string) {
       if (id.includes('node_modules')) return null;
