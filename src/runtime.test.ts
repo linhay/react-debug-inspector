@@ -239,4 +239,38 @@ describe('react-debug-inspector runtime', () => {
       window.removeEventListener('click', laterCaptureListener, { capture: true });
     }
   });
+
+  it('should stop later window mousedown capture listeners while selecting a debug target', () => {
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async () => undefined,
+      },
+    });
+
+    const target = document.createElement('article');
+    target.setAttribute('data-debug', 'src/pages/DetailCard.tsx:DetailCard:article:12');
+    target.textContent = 'Open details';
+    document.body.appendChild(target);
+
+    initInspector();
+    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+
+    let laterCaptureMouseDowns = 0;
+    const laterCaptureListener = () => {
+      laterCaptureMouseDowns += 1;
+    };
+    window.addEventListener('mousedown', laterCaptureListener, { capture: true });
+
+    try {
+      toggle.click();
+      laterCaptureMouseDowns = 0;
+      target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+
+      expect(laterCaptureMouseDowns).toBe(0);
+    } finally {
+      window.removeEventListener('mousedown', laterCaptureListener, { capture: true });
+    }
+  });
 });

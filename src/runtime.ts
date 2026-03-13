@@ -224,6 +224,12 @@ export function initInspector() {
     }
   };
 
+  const isInspectorChromeTarget = (target: HTMLElement | null) => {
+    if (!target) return false;
+    if (target === toggleBtn || target === overlay || target === tooltip || target === actionMenu) return true;
+    return !!target.closest('[data-inspector-ignore="true"]');
+  };
+
   const extractTextContent = (target: HTMLElement) => {
     const ariaLabel = normalizeText(target.getAttribute('aria-label') || '');
     if (ariaLabel) return truncateText(ariaLabel);
@@ -450,7 +456,7 @@ export function initInspector() {
     if (!isInspecting || !overlay || !tooltip) return;
     const target = event.target as HTMLElement | null;
     if (!target) return;
-    if (target === toggleBtn || target === overlay || target === tooltip || target.closest('[data-inspector-ignore="true"]')) {
+    if (isInspectorChromeTarget(target)) {
       return;
     }
 
@@ -618,11 +624,18 @@ export function initInspector() {
     });
   };
 
+  const handlePointerSuppression = (event: Event) => {
+    if (!isInspecting) return;
+    const target = event.target as HTMLElement | null;
+    if (!target || isInspectorChromeTarget(target)) return;
+    suppressEvent(event, { preventDefault: true, immediate: true });
+  };
+
   const handleWindowClick = (event: MouseEvent) => {
     if (!isInspecting) return;
     const target = event.target as HTMLElement | null;
     if (!target || target === toggleBtn) return;
-    if (target.closest('[data-inspector-ignore="true"]')) {
+    if (isInspectorChromeTarget(target)) {
       return;
     }
 
@@ -660,6 +673,12 @@ export function initInspector() {
   win.addEventListener('resize', scheduleAnchorUpdate);
   win.addEventListener('scroll', scheduleAnchorUpdate, true);
   doc.addEventListener('mousemove', handleMouseMove);
+  win.addEventListener('pointerdown', handlePointerSuppression, { capture: true });
+  win.addEventListener('pointerup', handlePointerSuppression, { capture: true });
+  win.addEventListener('mousedown', handlePointerSuppression, { capture: true });
+  win.addEventListener('mouseup', handlePointerSuppression, { capture: true });
+  win.addEventListener('touchstart', handlePointerSuppression, { capture: true });
+  win.addEventListener('touchend', handlePointerSuppression, { capture: true });
   win.addEventListener('click', handleWindowClick, { capture: true });
   win.addEventListener('keydown', handleKeyDown);
   updateAnchorForDialogs();
@@ -670,6 +689,12 @@ export function initInspector() {
     win.removeEventListener('resize', scheduleAnchorUpdate);
     win.removeEventListener('scroll', scheduleAnchorUpdate, true);
     doc.removeEventListener('mousemove', handleMouseMove);
+    win.removeEventListener('pointerdown', handlePointerSuppression, { capture: true });
+    win.removeEventListener('pointerup', handlePointerSuppression, { capture: true });
+    win.removeEventListener('mousedown', handlePointerSuppression, { capture: true });
+    win.removeEventListener('mouseup', handlePointerSuppression, { capture: true });
+    win.removeEventListener('touchstart', handlePointerSuppression, { capture: true });
+    win.removeEventListener('touchend', handlePointerSuppression, { capture: true });
     win.removeEventListener('click', handleWindowClick, { capture: true });
     win.removeEventListener('keydown', handleKeyDown);
     for (const eventName of shieldedEvents) {

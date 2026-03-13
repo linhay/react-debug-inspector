@@ -101,6 +101,51 @@ test.describe('React Debug Inspector E2E', () => {
     expect(cursor).toBe('');
   });
 
+  test('should not trigger React onClick while selecting an element', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
+
+    const openDialogButton = page.getByRole('button', { name: 'Open Dialog' });
+    await openDialogButton.click();
+    await page.waitForTimeout(200);
+
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toContain('App.tsx:Button:button');
+    await expect(page.getByText('Dialog Title')).toHaveCount(0);
+  });
+
+  test('should not trigger clickable card React onClick while selecting an element', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
+
+    const clickableCard = page.locator('article.clickable-card');
+    await clickableCard.click();
+    await page.waitForTimeout(200);
+
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toContain('App.tsx:App:article');
+    await expect(page.getByText('Card state: none')).toBeVisible();
+  });
+
+  test('should not trigger early mouse handlers while selecting an element', async ({ page }) => {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    await toggleBtn.click();
+
+    const pressableCard = page.locator('article.pressable-card');
+    await pressableCard.click();
+    await page.waitForTimeout(200);
+
+    const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(clipboardText).toContain('App.tsx:App:article');
+    await expect(page.getByText('Press state: idle')).toBeVisible();
+  });
+
   test('should exit inspection mode on Escape key', async ({ page }) => {
     const toggleBtn = page.locator('button[title="开启组件定位器"]');
     await toggleBtn.click();

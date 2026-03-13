@@ -29,6 +29,8 @@ const previewImage =
 function App() {
   const [count, setCount] = useState(0);
   const [showDialog, setShowDialog] = useState(false);
+  const [selectedCard, setSelectedCard] = useState('none');
+  const [pressedCard, setPressedCard] = useState('idle');
 
   return (
     <div className="app">
@@ -85,6 +87,26 @@ function App() {
                 'Works with nested and dynamic elements',
               ]}
             />
+          </section>
+
+          <section className="section section-wide">
+            <h2>Clickable Card Example</h2>
+            <p className="section-intro">Selecting this card in inspect mode should not trigger its React onClick.</p>
+            <article className="card clickable-card" onClick={() => setSelectedCard('details-opened')}>
+              <h3>Open Details Card</h3>
+              <p>Clicking this card normally updates app state to simulate navigation.</p>
+            </article>
+            <p className="section-intro">Card state: {selectedCard}</p>
+          </section>
+
+          <section className="section section-wide">
+            <h2>Pressable Card Example</h2>
+            <p className="section-intro">Selecting this card in inspect mode should not trigger early mouse handlers either.</p>
+            <article className="card pressable-card" onMouseDown={() => setPressedCard('pressed')}>
+              <h3>Mouse Down Card</h3>
+              <p>Some apps start interactions on mouse down instead of click.</p>
+            </article>
+            <p className="section-intro">Press state: {pressedCard}</p>
           </section>
 
           <section className="section section-wide copy-showcase">
