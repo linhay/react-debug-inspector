@@ -24,8 +24,12 @@
 4. 使用悬浮菜单复制文案、图片或全部上下文
 4. 按 `Esc` 键退出检查模式
 
-<!-- TODO: 添加演示 GIF -->
-<!-- ![基本使用演示](./assets/demo-basic.gif) -->
+<video controls width="100%" preload="metadata">
+  <source src="./assets/demo/20260318-debug-select-and-paste-with-cursor.mp4" type="video/mp4" />
+  <source src="./assets/demo/20260318-debug-select-and-paste-with-cursor.webm" type="video/webm" />
+  你的浏览器不支持 video 标签，可直接下载视频查看：
+  <a href="./assets/demo/20260318-debug-select-and-paste-with-cursor.mp4">MP4</a>
+</video>
 
 ## 特性
 
