@@ -1,6 +1,6 @@
 {
   "name": "@linhey/react-debug-inspector",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "A developer tool to inspect React components in browser and jump to source code.",
   "author": "linhey",
   "license": "MIT",
