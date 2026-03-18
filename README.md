@@ -114,6 +114,9 @@ npm test
 # 运行 E2E 测试
 npm run test:e2e
 
+# 录制演示视频（选择元素 -> 粘贴到输入框）
+npm run record:demo
+
 # 运行所有测试
 npm run test:all
 

@@ -54,6 +54,14 @@ function App() {
           <p className="hero-subtitle">
             Try clicking the 🎯 button in the corner to inspect elements and jump back to source context.
           </p>
+          <div className="demo-input-container">
+            <input
+              type="text"
+              className="demo-input"
+              placeholder="点击 🎯 按钮，选择元素后，在此处粘贴内容..."
+              id="demo-paste-input"
+            />
+          </div>
           <div className="hero-meta">filename › component › tag:line</div>
         </div>
       </header>

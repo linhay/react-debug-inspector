@@ -1,0 +1,1 @@
+export { initInspector } from './runtime';
