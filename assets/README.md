@@ -17,10 +17,8 @@ assets/
 
 ## 📸 如何添加截图
 
-1. 查看 [SCREENSHOT_GUIDE.md](../SCREENSHOT_GUIDE.md) 了解截图规范
-2. 查看 [RECORDING_GUIDE.md](../RECORDING_GUIDE.md) 了解录制 GIF
-3. 将文件放入此目录
-4. 在 README.md 中引用
+1. 将文件放入此目录
+2. 在 README.md 中引用
 
 ## 🎨 文件规范
 

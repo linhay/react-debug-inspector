@@ -27,8 +27,6 @@
 <!-- TODO: 添加演示 GIF -->
 <!-- ![基本使用演示](./assets/demo-basic.gif) -->
 
-> 📹 查看 [录制指南](./RECORDING_GUIDE.md) 了解如何制作演示视频
-
 ## 特性
 
 - 🚀 **零配置注入**：通过 Babel 插件自动为每个 JSX 元素添加 `data-debug` 属性。
