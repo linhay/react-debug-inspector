@@ -144,6 +144,7 @@ npm run dev   # next dev（Next.js 16+ 默认 Turbopack）
 ```
 
 可参考仓库内示例工程：`examples/next-turbopack`。
+如需旧项目（`pages/`）示例，可参考：`examples/next-pages-router`。
 
 ## 交互说明
 

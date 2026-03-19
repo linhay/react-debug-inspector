@@ -90,6 +90,7 @@ export default function App({ Component, pageProps }: AppProps) {
 注意：
 - `pages` 与 `app` 两种路由模式二选一接入即可，不要重复初始化。
 - `.babelrc` 配置保持一致，仍然需要 `module:@linhey/react-debug-inspector`。
+- 可直接参考仓库示例：`examples/next-pages-router`。
 
 ### 6) 启动开发服务并验证
 ```bash
@@ -101,6 +102,10 @@ npm run dev
 2. 页面元素出现 `data-debug="<path>:<Component>:<tag>:<line>"`。
 3. 点击 inspector 后可悬浮查看并复制调试标识。
 4. Pages Router 项目中，`pages/*` 页面同样可看到 `data-debug` 注入。
+
+示例路径：
+- App Router（Turbopack）：`examples/next-turbopack`
+- Pages Router：`examples/next-pages-router`
 
 ## 常见失败与修复
 1. 报错 `Cannot find module '@linhey/babel-plugin-react-debug-inspector'`
