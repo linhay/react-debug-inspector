@@ -87,6 +87,64 @@ if (import.meta.env.DEV) {
 }
 ```
 
+### 3. 配置 Next.js（含 Turbopack）
+
+`Next.js 16+` 默认开发模式即 Turbopack。使用本库时，建议通过 Babel 插件注入 `data-debug`，并在客户端初始化检查器。
+
+`.babelrc`（注意 `module:` 前缀）：
+
+```json
+{
+  "presets": ["next/babel"],
+  "plugins": ["module:@linhey/react-debug-inspector"]
+}
+```
+
+`app/inspector-client.tsx`：
+
+```tsx
+'use client';
+
+import { useEffect } from 'react';
+import { initInspector } from '@linhey/react-debug-inspector/browser';
+
+export default function InspectorClient() {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      initInspector();
+    }
+  }, []);
+
+  return null;
+}
+```
+
+`app/layout.tsx`：
+
+```tsx
+import type { ReactNode } from 'react';
+import InspectorClient from './inspector-client';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <InspectorClient />
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+启动命令：
+
+```bash
+npm run dev   # next dev（Next.js 16+ 默认 Turbopack）
+```
+
+可参考仓库内示例工程：`examples/next-turbopack`。
+
 ## 交互说明
 
 - **🎯 按钮**：位于右下角，点击进入/退出审查模式。
