@@ -66,7 +66,32 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 }
 ```
 
-### 5) 启动开发服务并验证
+### 5) 旧项目可选：Pages Router（`pages/_app.tsx`）接入
+如果项目还在使用 `pages` 目录，可直接使用下面示例：
+
+文件：`pages/_app.tsx`
+
+```tsx
+import type { AppProps } from 'next/app';
+import { useEffect } from 'react';
+import { initInspector } from '@linhey/react-debug-inspector/browser';
+
+export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      initInspector();
+    }
+  }, []);
+
+  return <Component {...pageProps} />;
+}
+```
+
+注意：
+- `pages` 与 `app` 两种路由模式二选一接入即可，不要重复初始化。
+- `.babelrc` 配置保持一致，仍然需要 `module:@linhey/react-debug-inspector`。
+
+### 6) 启动开发服务并验证
 ```bash
 npm run dev
 ```
@@ -75,6 +100,7 @@ npm run dev
 1. 页面右下角出现 inspector 按钮。
 2. 页面元素出现 `data-debug="<path>:<Component>:<tag>:<line>"`。
 3. 点击 inspector 后可悬浮查看并复制调试标识。
+4. Pages Router 项目中，`pages/*` 页面同样可看到 `data-debug` 注入。
 
 ## 常见失败与修复
 1. 报错 `Cannot find module '@linhey/babel-plugin-react-debug-inspector'`
