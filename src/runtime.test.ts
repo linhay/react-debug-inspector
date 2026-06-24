@@ -1,10 +1,16 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { initInspector } from './runtime';
 
 describe('react-debug-inspector runtime', () => {
   const waitNextFrame = () => new Promise((resolve) => setTimeout(resolve, 20));
+  const getToggleCapsule = () =>
+    document.body.querySelector('div[title="组件定位器"]') as HTMLDivElement | null;
+  const getSingleToggle = () =>
+    document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
+  const getContinuousToggle = () =>
+    document.body.querySelector('button[title="持续定位：保持开启，按 Esc 退出"]') as HTMLButtonElement | null;
 
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -12,7 +18,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should move toggle button to left when dialog is visible', async () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -27,7 +33,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should not move toggle button when pointer moves after mousedown', () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -48,7 +54,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should keep toggle button on body while dialog is visible', async () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -62,7 +68,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should ignore aria-hidden dialog hosts', async () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -81,7 +87,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should remain visible when dialog has transform host', async () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -99,7 +105,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should move toggle button into radix dialog node when dialog is visible', async () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -116,7 +122,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should clear hidden and inert flags from toggle button while dialog is visible', async () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getToggleCapsule();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -145,7 +151,7 @@ describe('react-debug-inspector runtime', () => {
 
     const original = document.elementsFromPoint;
     document.elementsFromPoint = (() => {
-      const btn = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+      const btn = getToggleCapsule();
       if (btn?.style.right === '24px' && btn?.style.bottom === '24px') {
         return [obstruction, document.body];
       }
@@ -155,7 +161,7 @@ describe('react-debug-inspector runtime', () => {
 
     try {
       initInspector();
-      const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+      const button = getToggleCapsule();
       expect(button).not.toBeNull();
       if (!button) return;
 
@@ -172,7 +178,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should shield toggle button click from document bubble listeners', () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getSingleToggle();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -190,7 +196,7 @@ describe('react-debug-inspector runtime', () => {
 
   it('should shield toggle button mousedown from document bubble listeners', () => {
     initInspector();
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const button = getSingleToggle();
     expect(button).not.toBeNull();
     if (!button) return;
 
@@ -219,7 +225,7 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(target);
 
     initInspector();
-    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
     expect(toggle).not.toBeNull();
     if (!toggle) return;
 
@@ -240,6 +246,91 @@ describe('react-debug-inspector runtime', () => {
     }
   });
 
+  it('should exit after one selection in single mode', async () => {
+    vi.useFakeTimers();
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    try {
+      const target = document.createElement('article');
+      const debugId = 'src/pages/DetailCard.tsx:DetailCard:article:12';
+      target.setAttribute('data-debug', debugId);
+      target.textContent = 'Open details';
+      document.body.appendChild(target);
+
+      initInspector();
+      const toggle = getSingleToggle();
+      expect(toggle).not.toBeNull();
+      if (!toggle) return;
+
+      toggle.click();
+      expect(document.body.style.cursor).toBe('crosshair');
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(601);
+
+      expect(writeSpyCalls).toContain(debugId);
+      expect(document.body.style.cursor).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('should keep inspecting after selection in continuous mode', async () => {
+    vi.useFakeTimers();
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    try {
+      const target = document.createElement('article');
+      const debugId = 'src/pages/DetailCard.tsx:DetailCard:article:12';
+      target.setAttribute('data-debug', debugId);
+      target.textContent = 'Open details';
+      document.body.appendChild(target);
+
+      initInspector();
+      const toggle = getContinuousToggle();
+      expect(toggle).not.toBeNull();
+      if (!toggle) return;
+
+      toggle.click();
+      expect(document.body.style.cursor).toBe('crosshair');
+      target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+      target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const feedback = Array.from(document.querySelectorAll('div')).find((element) =>
+        element.textContent?.includes('已复制 Debug ID'),
+      ) as HTMLDivElement | undefined;
+      expect(feedback).toBeTruthy();
+      expect(feedback?.style.display).not.toBe('none');
+
+      await vi.advanceTimersByTimeAsync(601);
+
+      expect(writeSpyCalls).toContain(debugId);
+      expect(document.body.style.cursor).toBe('crosshair');
+      expect(feedback?.style.display).toBe('none');
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(document.body.style.cursor).toBe('');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('should stop later window mousedown capture listeners while selecting a debug target', () => {
     Object.assign(navigator, {
       clipboard: {
@@ -253,7 +344,7 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(target);
 
     initInspector();
-    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
     expect(toggle).not.toBeNull();
     if (!toggle) return;
 
@@ -287,7 +378,7 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(target);
 
     initInspector();
-    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
     expect(toggle).not.toBeNull();
     if (!toggle) return;
 
@@ -325,7 +416,7 @@ describe('react-debug-inspector runtime', () => {
     document.body.appendChild(target);
 
     initInspector();
-    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement | null;
+    const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
     expect(toggle).not.toBeNull();
     if (!toggle) return;
 
@@ -344,6 +435,250 @@ describe('react-debug-inspector runtime', () => {
       expect(writeSpyCalls).toContain(debugId);
     } finally {
       window.removeEventListener('touchend', laterCaptureListener, { capture: true });
+    }
+  });
+
+  it('should select the best debug target from a dragged area', () => {
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    const parent = document.createElement('section');
+    parent.setAttribute('data-debug', 'src/pages/App.tsx:App:section:1');
+    parent.getBoundingClientRect = () => ({
+      left: 0, top: 0, right: 300, bottom: 300, width: 300, height: 300, x: 0, y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    const target = document.createElement('button');
+    const debugId = 'src/pages/Button.tsx:Button:button:12';
+    target.setAttribute('data-debug', debugId);
+    target.getBoundingClientRect = () => ({
+      left: 50, top: 50, right: 90, bottom: 90, width: 40, height: 40, x: 50, y: 50,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    parent.appendChild(target);
+    document.body.appendChild(parent);
+
+    initInspector();
+    const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
+    expect(toggle).not.toBeNull();
+    if (!toggle) return;
+
+    toggle.click();
+    target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, clientX: 45, clientY: 45 }));
+    target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: 95, clientY: 95 }));
+    target.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, clientX: 95, clientY: 95 }));
+
+    expect(writeSpyCalls).toContain(debugId);
+  });
+
+  it('should use elementsFromPoint candidates for point selection', () => {
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    const wrong = document.createElement('div');
+    wrong.setAttribute('data-debug', 'src/pages/Wrong.tsx:Wrong:div:1');
+    const right = document.createElement('div');
+    const debugId = 'src/pages/Right.tsx:Right:div:2';
+    right.setAttribute('data-debug', debugId);
+    document.body.append(wrong, right);
+
+    const original = document.elementsFromPoint;
+    document.elementsFromPoint = (() => [right, wrong, document.body]) as typeof document.elementsFromPoint;
+
+    try {
+      initInspector();
+      const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
+      expect(toggle).not.toBeNull();
+      if (!toggle) return;
+
+      toggle.click();
+      wrong.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }));
+
+      expect(writeSpyCalls).toContain(debugId);
+    } finally {
+      if (original) {
+        document.elementsFromPoint = original;
+      } else {
+        // @ts-expect-error restore optional API in jsdom
+        delete document.elementsFromPoint;
+      }
+    }
+  });
+
+  it('should show point candidates on context menu and select clicked candidate', () => {
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    const parent = document.createElement('section');
+    const parentDebugId = 'src/pages/Card.tsx:Card:section:8';
+    parent.setAttribute('data-debug', parentDebugId);
+    const child = document.createElement('button');
+    const childDebugId = 'src/pages/Button.tsx:Button:button:12';
+    child.setAttribute('data-debug', childDebugId);
+    const other = document.createElement('aside');
+    const otherDebugId = 'src/pages/Other.tsx:Other:aside:20';
+    other.setAttribute('data-debug', otherDebugId);
+    parent.appendChild(child);
+    document.body.append(parent, other);
+
+    const original = document.elementsFromPoint;
+    let pointStack: Element[] = [child, parent, document.body];
+    document.elementsFromPoint = (() => pointStack) as typeof document.elementsFromPoint;
+
+    try {
+      initInspector();
+      const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
+      expect(toggle).not.toBeNull();
+      if (!toggle) return;
+
+      toggle.click();
+      child.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 }));
+
+      const parentCandidate = document.body.querySelector(`button[title="${parentDebugId}"]`) as HTMLButtonElement | null;
+      expect(parentCandidate).not.toBeNull();
+      expect(document.body.querySelector(`button[title="${childDebugId}"]`)).not.toBeNull();
+
+      pointStack = [other, document.body];
+      other.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, cancelable: true, clientX: 30, clientY: 30 }));
+      const stillPreviewingChild = Array.from(document.body.querySelectorAll('div'))
+        .some((el) => el.getAttribute('title') === childDebugId);
+      const previewingOther = Array.from(document.body.querySelectorAll('div'))
+        .some((el) => el.getAttribute('title') === otherDebugId);
+      expect(stillPreviewingChild).toBe(true);
+      expect(previewingOther).toBe(false);
+
+      parentCandidate?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+      expect(document.body.querySelector('button[title="复制选项: 复制 Debug ID"]')).not.toBeNull();
+      parentCandidate?.click();
+
+      expect(writeSpyCalls).toContain(parentDebugId);
+    } finally {
+      if (original) {
+        document.elementsFromPoint = original;
+      } else {
+        // @ts-expect-error restore optional API in jsdom
+        delete document.elementsFromPoint;
+      }
+    }
+  });
+
+  it('should open copy action menu from a point candidate', () => {
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    const target = document.createElement('button');
+    const debugId = 'src/pages/Button.tsx:Button:button:12';
+    target.setAttribute('data-debug', debugId);
+    target.textContent = 'Copy me';
+    document.body.appendChild(target);
+
+    const original = document.elementsFromPoint;
+    document.elementsFromPoint = (() => [target, document.body]) as typeof document.elementsFromPoint;
+
+    try {
+      initInspector();
+      const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
+      expect(toggle).not.toBeNull();
+      if (!toggle) return;
+
+      toggle.click();
+      target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 }));
+
+      const candidate = document.body.querySelector(`button[title="${debugId}"]`) as HTMLButtonElement | null;
+      expect(candidate).not.toBeNull();
+      candidate?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+
+      const textAction = document.body.querySelector('button[title="复制选项: 复制文案"]') as HTMLButtonElement | null;
+      expect(textAction).not.toBeNull();
+      expect(document.body.querySelector('button[title="复制选项: 复制图片"]')).toBeNull();
+      textAction?.click();
+
+      expect(writeSpyCalls).toContain('Copy me');
+    } finally {
+      if (original) {
+        document.elementsFromPoint = original;
+      } else {
+        // @ts-expect-error restore optional API in jsdom
+        delete document.elementsFromPoint;
+      }
+    }
+  });
+
+  it('should show point candidates on touch long press without selecting on release', () => {
+    vi.useFakeTimers();
+    const writeSpyCalls: string[] = [];
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: async (value: string) => {
+          writeSpyCalls.push(value);
+        },
+      },
+    });
+
+    const target = document.createElement('button');
+    const debugId = 'src/pages/Button.tsx:Button:button:12';
+    target.setAttribute('data-debug', debugId);
+    document.body.appendChild(target);
+
+    const original = document.elementsFromPoint;
+    document.elementsFromPoint = (() => [target, document.body]) as typeof document.elementsFromPoint;
+
+    try {
+      initInspector();
+      const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement | null;
+      expect(toggle).not.toBeNull();
+      if (!toggle) return;
+
+      toggle.click();
+      const pointerDown = new MouseEvent('pointerdown', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 });
+      Object.defineProperty(pointerDown, 'pointerType', { value: 'touch' });
+      target.dispatchEvent(pointerDown);
+      vi.advanceTimersByTime(500);
+
+      const candidate = document.body.querySelector(`button[title="${debugId}"]`) as HTMLButtonElement | null;
+      expect(candidate).not.toBeNull();
+
+      const pointerUp = new MouseEvent('pointerup', { bubbles: true, cancelable: true, clientX: 20, clientY: 20 });
+      Object.defineProperty(pointerUp, 'pointerType', { value: 'touch' });
+      target.dispatchEvent(pointerUp);
+      expect(writeSpyCalls).not.toContain(debugId);
+
+      candidate?.click();
+      expect(writeSpyCalls).toContain(debugId);
+    } finally {
+      vi.useRealTimers();
+      if (original) {
+        document.elementsFromPoint = original;
+      } else {
+        // @ts-expect-error restore optional API in jsdom
+        delete document.elementsFromPoint;
+      }
     }
   });
 });

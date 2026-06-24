@@ -23,18 +23,31 @@ export function initInspector() {
     source: 'img' | 'background';
   };
   type ActionKind = 'id' | 'text' | 'image' | 'all';
+  type Point = { clientX: number; clientY: number };
+  type DebugCandidate = { debugEl: HTMLElement; debugId: string };
 
   let isInspecting = false;
   let overlay: HTMLDivElement | null = null;
+  let selectionOverlay: HTMLDivElement | null = null;
   let tooltip: HTMLDivElement | null = null;
   let actionMenu: HTMLDivElement | null = null;
+  let candidateMenu: HTMLDivElement | null = null;
+  let candidateActionMenu: HTMLDivElement | null = null;
+  let activeCandidateActionAnchor: HTMLElement | null = null;
+  let candidateMenuEntries = new WeakMap<HTMLElement, DebugCandidate>();
   let latestContext: InspectContext | null = null;
   let lastHoveredDebugEl: HTMLElement | null = null;
   let latestHoverEvent: MouseEvent | null = null;
   let pendingHoverFrame = false;
   let anchorUpdatePending = false;
   let selectionLocked = false;
+  let inspectMode: 'single' | 'continuous' = 'single';
+  let areaStart: { x: number; y: number } | null = null;
+  let isAreaSelecting = false;
+  let longPressTimer: number | null = null;
   const edgeOffset = 24;
+  const areaSelectionThreshold = 6;
+  const longPressDelay = 500;
   const successColor = '#10b981';
   const defaultOverlayBg = 'rgba(14, 165, 233, 0.15)';
   const defaultOverlayBorder = '#0ea5e9';
@@ -47,29 +60,52 @@ export function initInspector() {
     return win.setTimeout(() => cb(Date.now()), 16);
   };
 
-  const toggleBtn = document.createElement('button');
-  toggleBtn.innerHTML = '🎯';
-  toggleBtn.title = '开启组件定位器';
+  const toggleBtn = document.createElement('div');
+  toggleBtn.title = '组件定位器';
+  toggleBtn.dataset.inspectorIgnore = 'true';
   toggleBtn.style.cssText = `
     position: fixed;
     bottom: 24px;
     right: 24px;
-    width: 44px;
-    height: 44px;
-    border-radius: 22px;
-    background: #0ea5e9;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.92);
     color: white;
-    border: 2px solid white;
+    border: 1px solid rgba(255, 255, 255, 0.86);
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    cursor: pointer;
     z-index: 9999999;
-    font-size: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 2px;
+    padding: 4px;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   `;
+  const singleToggleBtn = document.createElement('button');
+  singleToggleBtn.type = 'button';
+  singleToggleBtn.textContent = '单次';
+  singleToggleBtn.title = '单次定位：选中后自动退出';
+  singleToggleBtn.dataset.inspectorIgnore = 'true';
+  const continuousToggleBtn = document.createElement('button');
+  continuousToggleBtn.type = 'button';
+  continuousToggleBtn.textContent = '持续';
+  continuousToggleBtn.title = '持续定位：保持开启，按 Esc 退出';
+  continuousToggleBtn.dataset.inspectorIgnore = 'true';
+  const toggleSegmentStyle = 'border: 0; border-radius: 999px; padding: 7px 10px; color: #cbd5e1; background: transparent; cursor: pointer; font-size: 12px; font-weight: 800; line-height: 1; white-space: nowrap; transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;';
+  singleToggleBtn.style.cssText = toggleSegmentStyle;
+  continuousToggleBtn.style.cssText = toggleSegmentStyle;
+  toggleBtn.append(singleToggleBtn, continuousToggleBtn);
   doc.body.appendChild(toggleBtn);
+
+  const inspectorStyle = doc.createElement('style');
+  inspectorStyle.textContent = `
+    [data-inspector-menu-item="true"]:hover,
+    [data-inspector-menu-item="true"]:focus-visible,
+    [data-inspector-menu-active="true"] {
+      background: rgba(14, 165, 233, 0.22) !important;
+      color: #ffffff !important;
+    }
+  `;
+  doc.head.appendChild(inspectorStyle);
 
   const applyAnchor = (anchor: Anchor) => {
     toggleBtn.style.top = anchor.startsWith('top') ? `${edgeOffset}px` : '';
@@ -82,6 +118,20 @@ export function initInspector() {
     toggleBtn.style.right = `${edgeOffset}px`;
     toggleBtn.style.left = '';
   };
+
+  const updateToggleAppearance = () => {
+    toggleBtn.style.transform = isInspecting ? 'scale(0.98)' : 'scale(1)';
+    toggleBtn.style.background = isInspecting ? 'rgba(15, 23, 42, 0.98)' : 'rgba(15, 23, 42, 0.92)';
+    const applySegmentState = (button: HTMLButtonElement, active: boolean) => {
+      button.style.background = active ? '#0ea5e9' : 'transparent';
+      button.style.color = active ? '#ffffff' : '#cbd5e1';
+      button.style.boxShadow = active ? '0 3px 10px rgba(14, 165, 233, 0.34)' : 'none';
+    };
+    applySegmentState(singleToggleBtn, isInspecting && inspectMode === 'single');
+    applySegmentState(continuousToggleBtn, isInspecting && inspectMode === 'continuous');
+  };
+
+  updateToggleAppearance();
 
   const getVisibleDialogs = () => {
     const candidates = Array.from(
@@ -114,18 +164,20 @@ export function initInspector() {
     toggleBtn.removeAttribute('data-aria-hidden');
     toggleBtn.removeAttribute('inert');
     if ('inert' in toggleBtn) {
-      (toggleBtn as HTMLButtonElement & { inert?: boolean }).inert = false;
+      (toggleBtn as HTMLElement & { inert?: boolean }).inert = false;
     }
     toggleBtn.style.pointerEvents = 'auto';
   };
 
   const isIgnorableObstacle = (el: Element) => {
-    if (el === toggleBtn || el === overlay || el === tooltip || el === actionMenu) return true;
+    if (el === toggleBtn || el === overlay || el === tooltip || el === actionMenu || el === candidateMenu || el === candidateActionMenu) return true;
     if (el instanceof HTMLElement) {
       if (el.contains(toggleBtn) || toggleBtn.contains(el)) return true;
       if (overlay && el.contains(overlay)) return true;
       if (tooltip && el.contains(tooltip)) return true;
       if (actionMenu && (el.contains(actionMenu) || actionMenu.contains(el))) return true;
+      if (candidateMenu && (el.contains(candidateMenu) || candidateMenu.contains(el))) return true;
+      if (candidateActionMenu && (el.contains(candidateActionMenu) || candidateActionMenu.contains(el))) return true;
       if (el === doc.body || el === doc.documentElement) return true;
       if (el.getAttribute('data-inspector-ignore') === 'true') return true;
       const style = window.getComputedStyle(el);
@@ -208,6 +260,15 @@ export function initInspector() {
     return debugId.replace(/:/g, ' › ');
   };
 
+  const formatCompactDebugId = (debugId: string) => {
+    const parts = debugId.split(':');
+    if (parts.length === 4) {
+      const [, componentName, tagName, line] = parts;
+      return `${componentName} › ${tagName}:${line}`;
+    }
+    return formatDebugId(debugId);
+  };
+
   const normalizeText = (value: string) => value.replace(/\s+/g, ' ').trim();
 
   const truncateText = (value: string, limit = 500) => {
@@ -227,8 +288,118 @@ export function initInspector() {
 
   const isInspectorChromeTarget = (target: HTMLElement | null) => {
     if (!target) return false;
-    if (target === toggleBtn || target === overlay || target === tooltip || target === actionMenu) return true;
+    if (target === toggleBtn || target === overlay || target === selectionOverlay || target === tooltip || target === actionMenu || target === candidateMenu || target === candidateActionMenu) return true;
     return !!target.closest('[data-inspector-ignore="true"]');
+  };
+
+  const hasPointerPoint = (event: Event): event is MouseEvent => 'clientX' in event && 'clientY' in event;
+
+  const getEventPoint = (event: Event): Point | null => {
+    if (hasPointerPoint(event)) return { clientX: event.clientX, clientY: event.clientY };
+    const touchEvent = event as TouchEvent;
+    if ('touches' in event && touchEvent.touches.length > 0) {
+      const touch = touchEvent.touches[0];
+      return { clientX: touch.clientX, clientY: touch.clientY };
+    }
+    if ('changedTouches' in event && touchEvent.changedTouches.length > 0) {
+      const touch = touchEvent.changedTouches[0];
+      return { clientX: touch.clientX, clientY: touch.clientY };
+    }
+    return null;
+  };
+
+  const buildAreaRect = (event: MouseEvent) => {
+    if (!areaStart) return null;
+    const left = Math.min(areaStart.x, event.clientX);
+    const top = Math.min(areaStart.y, event.clientY);
+    const right = Math.max(areaStart.x, event.clientX);
+    const bottom = Math.max(areaStart.y, event.clientY);
+    return { left, top, right, bottom, width: right - left, height: bottom - top };
+  };
+
+  const clearAreaSelection = () => {
+    areaStart = null;
+    isAreaSelecting = false;
+    if (selectionOverlay) selectionOverlay.style.display = 'none';
+  };
+
+  const renderAreaSelection = (rect: { left: number; top: number; width: number; height: number }) => {
+    if (!selectionOverlay) return;
+    selectionOverlay.style.display = 'block';
+    selectionOverlay.style.left = `${rect.left}px`;
+    selectionOverlay.style.top = `${rect.top}px`;
+    selectionOverlay.style.width = `${rect.width}px`;
+    selectionOverlay.style.height = `${rect.height}px`;
+  };
+
+  const updateAreaSelection = (event: MouseEvent) => {
+    if (!areaStart) return false;
+    const rect = buildAreaRect(event);
+    if (!rect) return false;
+    if (!isAreaSelecting && Math.max(rect.width, rect.height) < areaSelectionThreshold) return false;
+    isAreaSelecting = true;
+    clearLongPress();
+    renderAreaSelection(rect);
+    hideActionMenu();
+    if (tooltip) tooltip.style.display = 'none';
+    return true;
+  };
+
+  const getIntersectionArea = (
+    a: { left: number; top: number; right: number; bottom: number },
+    b: { left: number; top: number; right: number; bottom: number },
+  ) => {
+    const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+    const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    return width * height;
+  };
+
+  const findAreaDebugTarget = (areaRect: { left: number; top: number; right: number; bottom: number }) => {
+    let best: { el: HTMLElement; score: number; area: number } | null = null;
+    for (const el of Array.from(doc.querySelectorAll<HTMLElement>('[data-debug]'))) {
+      const rect = el.getBoundingClientRect();
+      const area = rect.width * rect.height;
+      if (area <= 0) continue;
+      const overlap = getIntersectionArea(areaRect, rect);
+      if (overlap <= 0) continue;
+      const score = overlap / area;
+      if (!best || score > best.score || (score === best.score && area < best.area)) {
+        best = { el, score, area };
+      }
+    }
+    return best?.el || null;
+  };
+
+  const collectDebugCandidate = (candidates: DebugCandidate[], seen: Set<HTMLElement>, debugEl: HTMLElement | null) => {
+    if (!debugEl || seen.has(debugEl)) return;
+    const debugId = debugEl.getAttribute('data-debug');
+    if (!debugId) return;
+    seen.add(debugEl);
+    candidates.push({ debugEl, debugId });
+  };
+
+  const getPointDebugCandidates = (point: Point | null, target?: HTMLElement | null) => {
+    const candidates: DebugCandidate[] = [];
+    const seen = new Set<HTMLElement>();
+    const stack = point && typeof doc.elementsFromPoint === 'function'
+      ? doc.elementsFromPoint(point.clientX, point.clientY)
+      : target ? [target] : [];
+
+    for (const el of stack) {
+      if (!(el instanceof HTMLElement) || isInspectorChromeTarget(el)) continue;
+      let node: HTMLElement | null = el;
+      while (node && node !== doc.body && node !== doc.documentElement) {
+        collectDebugCandidate(candidates, seen, node.hasAttribute('data-debug') ? node : null);
+        node = node.parentElement;
+      }
+    }
+
+    collectDebugCandidate(candidates, seen, target?.closest('[data-debug]') as HTMLElement | null);
+    return candidates;
+  };
+
+  const findPointDebugTarget = (target: HTMLElement | null, event?: MouseEvent) => {
+    return getPointDebugCandidates(event ? getEventPoint(event) : null, target)[0]?.debugEl || null;
   };
 
   const extractTextContent = (target: HTMLElement) => {
@@ -298,6 +469,14 @@ export function initInspector() {
     `debugId: ${debugId}`,
   ].join('\n');
 
+  const buildScreenshotMetadataText = (context: InspectContext) => [
+    '[screenshot]',
+    `debugId: ${context.debugId}`,
+    `display: ${formatDebugId(context.debugId)}`,
+    `width: ${Math.round(context.rect.width)}`,
+    `height: ${Math.round(context.rect.height)}`,
+  ].join('\n');
+
   const buildCopyAllPayload = (context: InspectContext) => {
     const textValue = extractTextContent(context.debugEl);
     const image = resolveImageTarget(context.debugEl);
@@ -322,7 +501,7 @@ export function initInspector() {
       actionButtons.text.style.display = extractTextContent(context.debugEl) ? '' : 'none';
     }
     if (actionButtons.image) {
-      actionButtons.image.style.display = resolveImageTarget(context.debugEl) ? '' : 'none';
+      actionButtons.image.style.display = context.rect.width > 0 && context.rect.height > 0 ? '' : 'none';
     }
   };
 
@@ -348,6 +527,7 @@ export function initInspector() {
     tooltip.textContent = tone === 'success' ? `✅ ${message}` : `⚠️ ${message}`;
     tooltip.style.color = tone === 'success' ? successColor : '#f59e0b';
     tooltip.title = latestContext?.debugId || '';
+    tooltip.style.display = 'block';
     setOverlayTone(tone);
   };
 
@@ -395,14 +575,206 @@ export function initInspector() {
     actionMenu.style.display = 'none';
   };
 
+  const clearLongPress = () => {
+    if (longPressTimer === null) return;
+    win.clearTimeout(longPressTimer);
+    longPressTimer = null;
+  };
+
+  const hideCandidateMenu = () => {
+    if (!candidateMenu) return;
+    candidateMenu.style.display = 'none';
+    candidateMenu.replaceChildren();
+    hideCandidateActionMenu();
+  };
+
+  const isCandidateMenuOpen = () => candidateMenu?.style.display !== 'none';
+
+  const hideCandidateActionMenu = () => {
+    if (!candidateActionMenu) return;
+    activeCandidateActionAnchor?.removeAttribute('data-inspector-menu-active');
+    candidateActionMenu.style.display = 'none';
+    candidateActionMenu.replaceChildren();
+    activeCandidateActionAnchor = null;
+  };
+
+  const positionCandidateActionMenu = (anchor: HTMLElement) => {
+    if (!candidateActionMenu) return;
+    const anchorRect = anchor.getBoundingClientRect();
+    const menuRect = candidateMenu?.getBoundingClientRect();
+    const menuWidth = candidateActionMenu.offsetWidth || 150;
+    const menuHeight = candidateActionMenu.offsetHeight || 150;
+    let left = (menuRect?.right ?? anchorRect.right) + 6;
+    if (left + menuWidth > win.innerWidth - 8) {
+      left = Math.max(8, (menuRect?.left ?? anchorRect.left) - menuWidth - 6);
+    }
+    const top = Math.min(Math.max(8, anchorRect.top), Math.max(8, win.innerHeight - menuHeight - 8));
+    candidateActionMenu.style.left = `${left}px`;
+    candidateActionMenu.style.top = `${top}px`;
+  };
+
+  const showCandidateActionMenu = (anchor: HTMLElement, candidate: DebugCandidate) => {
+    if (!candidateActionMenu) return;
+    if (activeCandidateActionAnchor === anchor && candidateActionMenu.style.display !== 'none') return;
+    activeCandidateActionAnchor?.removeAttribute('data-inspector-menu-active');
+    activeCandidateActionAnchor = anchor;
+    anchor.dataset.inspectorMenuActive = 'true';
+    hideActionMenu();
+    candidateActionMenu.replaceChildren();
+    showDebugElement(candidate.debugEl);
+    hideActionMenu();
+    const context = latestContext;
+    if (!context) return;
+
+    for (const definition of actionDefinitions) {
+      if (definition.action === 'text' && !extractTextContent(context.debugEl)) continue;
+      if (definition.action === 'image' && (context.rect.width <= 0 || context.rect.height <= 0)) continue;
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.textContent = definition.label;
+      button.title = `复制选项: ${definition.label}`;
+      button.dataset.inspectorIgnore = 'true';
+      button.dataset.inspectorMenuItem = 'true';
+      button.style.cssText = `
+        display: block;
+        width: 100%;
+        border: 0;
+        border-radius: 7px;
+        padding: 7px 10px;
+        color: #e2e8f0;
+        background: transparent;
+        cursor: pointer;
+        font-size: 12px;
+        text-align: left;
+        white-space: nowrap;
+      `;
+      button.addEventListener('click', async (event) => {
+        suppressEvent(event, { preventDefault: true });
+        hideCandidateActionMenu();
+        hideCandidateMenu();
+        await performCopyAction(definition.action, context);
+      });
+      candidateActionMenu.appendChild(button);
+    }
+
+    candidateActionMenu.style.display = 'block';
+    positionCandidateActionMenu(anchor);
+  };
+
+  const showCandidateActionMenuFromEvent = (event: Event) => {
+    if (!candidateMenu || !isCandidateMenuOpen()) return;
+    const target = event.target;
+    if (!(target instanceof win.Element)) return;
+    const anchor = target.closest<HTMLElement>('[data-inspector-candidate-action-anchor="true"]');
+    if (!anchor || !candidateMenu.contains(anchor)) return;
+    const candidate = candidateMenuEntries.get(anchor);
+    if (!candidate) return;
+    showCandidateActionMenu(anchor, candidate);
+  };
+
+  const positionCandidateMenu = (point: Point) => {
+    if (!candidateMenu) return;
+    const width = candidateMenu.offsetWidth || 280;
+    const height = candidateMenu.offsetHeight || 180;
+    const left = Math.min(Math.max(8, point.clientX), Math.max(8, win.innerWidth - width - 8));
+    const top = Math.min(Math.max(8, point.clientY), Math.max(8, win.innerHeight - height - 8));
+    candidateMenu.style.left = `${left}px`;
+    candidateMenu.style.top = `${top}px`;
+  };
+
+  const showCandidateMenu = (point: Point, target: HTMLElement | null) => {
+    if (!candidateMenu) return false;
+    const candidates = getPointDebugCandidates(point, target).slice(0, 12);
+    if (candidates.length === 0) return false;
+    const previewCandidate = (debugEl: HTMLElement) => {
+      showDebugElement(debugEl);
+      hideActionMenu();
+    };
+    const formatCandidateLabel = (candidate: DebugCandidate) => {
+      const debugLabel = formatCompactDebugId(candidate.debugId);
+      const text = extractTextContent(candidate.debugEl);
+      return text ? `${debugLabel} · ${truncateText(text, 28)}` : debugLabel;
+    };
+
+    hideActionMenu();
+    clearAreaSelection();
+    candidateMenuEntries = new WeakMap();
+    candidateMenu.replaceChildren();
+
+    const title = doc.createElement('div');
+    title.textContent = '选择目标';
+    title.style.cssText = `
+      color: #94a3b8;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 8px 6px;
+      white-space: nowrap;
+    `;
+    candidateMenu.appendChild(title);
+
+    for (const candidate of candidates) {
+      const row = doc.createElement('div');
+      row.dataset.inspectorIgnore = 'true';
+      row.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      `;
+
+      const button = doc.createElement('button');
+      button.type = 'button';
+      button.textContent = formatCandidateLabel(candidate);
+      button.title = candidate.debugId;
+      button.dataset.inspectorIgnore = 'true';
+      button.dataset.inspectorCandidateActionAnchor = 'true';
+      button.dataset.inspectorMenuItem = 'true';
+      button.style.cssText = `
+        display: block;
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        border-radius: 7px;
+        padding: 7px 8px;
+        text-align: left;
+        color: #e2e8f0;
+        background: transparent;
+        cursor: pointer;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      `;
+      button.addEventListener('mouseenter', () => showCandidateActionMenu(button, candidate));
+      button.addEventListener('click', (event) => {
+        suppressEvent(event, { preventDefault: true });
+        hideCandidateMenu();
+        showDebugElement(candidate.debugEl);
+        finalizeSelection(candidate.debugId);
+      });
+
+      candidateMenuEntries.set(button, candidate);
+      row.appendChild(button);
+      candidateMenu.appendChild(row);
+    }
+
+    candidateMenu.style.display = 'block';
+    positionCandidateMenu(point);
+    previewCandidate(candidates[0].debugEl);
+    return true;
+  };
+
   const finalizeSelection = (debugId: string) => {
     selectionLocked = true;
     copyText(debugId)
       .then(() => {
-        showCopyFeedback('Copied!', 'success');
+        showCopyFeedback('已复制 Debug ID', 'success');
         win.setTimeout(() => {
           selectionLocked = false;
-          stopInspecting();
+          if (inspectMode === 'single') {
+            stopInspecting();
+          } else {
+            hideCurrentTarget();
+          }
         }, 600);
       })
       .catch(() => {
@@ -410,12 +782,16 @@ export function initInspector() {
       });
   };
 
-  const selectDebugTarget = (target: HTMLElement | null) => {
+  const selectDebugTarget = (target: HTMLElement | null, event?: MouseEvent) => {
     if (selectionLocked) return;
-    const debugEl = target?.closest('[data-debug]') as HTMLElement | null;
+    const debugEl = findPointDebugTarget(target, event);
     if (!debugEl) {
       selectionLocked = false;
-      stopInspecting();
+      if (inspectMode === 'single') {
+        stopInspecting();
+      } else {
+        hideCurrentTarget();
+      }
       return;
     }
 
@@ -424,31 +800,118 @@ export function initInspector() {
     finalizeSelection(debugId);
   };
 
+  const selectAreaDebugTarget = (areaRect: { left: number; top: number; right: number; bottom: number }) => {
+    if (selectionLocked) return;
+    const debugEl = findAreaDebugTarget(areaRect);
+    if (!debugEl) {
+      selectionLocked = false;
+      if (inspectMode === 'single') {
+        stopInspecting();
+      } else {
+        hideCurrentTarget();
+      }
+      return;
+    }
+
+    const debugId = debugEl.getAttribute('data-debug');
+    if (!debugId) return;
+    showDebugElement(debugEl);
+    finalizeSelection(debugId);
+  };
+
   const copyText = async (value: string) => {
     await navigator.clipboard.writeText(value);
   };
 
-  const copyImageBinary = async (image: ResolvedImage, debugId: string): Promise<'binary' | 'metadata'> => {
-    if (image.url.startsWith('data:')) {
-      await copyText(buildImageMetadataText(image, debugId));
-      return 'metadata';
+  const writeImageBlobToClipboard = async (blob: Blob) => {
+    const item = new window.ClipboardItem({ [blob.type]: blob });
+    await navigator.clipboard.write([item]);
+  };
+
+  const renderImageUrlToPng = async (url: string): Promise<Blob | null> => {
+    return new Promise((resolve) => {
+      const imageEl = new Image();
+      imageEl.crossOrigin = 'anonymous';
+      imageEl.onload = () => {
+        const canvas = doc.createElement('canvas');
+        canvas.width = imageEl.naturalWidth || imageEl.width;
+        canvas.height = imageEl.naturalHeight || imageEl.height;
+        const context = canvas.getContext('2d');
+        if (!context || !canvas.width || !canvas.height) {
+          resolve(null);
+          return;
+        }
+        context.drawImage(imageEl, 0, 0);
+        canvas.toBlob((blob) => resolve(blob), 'image/png');
+      };
+      imageEl.onerror = () => resolve(null);
+      imageEl.src = url;
+    });
+  };
+
+  const inlineElementStyles = (source: Element, clone: Element) => {
+    if (source instanceof HTMLElement && clone instanceof HTMLElement) {
+      const computed = win.getComputedStyle(source);
+      for (const property of Array.from(computed)) {
+        clone.style.setProperty(property, computed.getPropertyValue(property), computed.getPropertyPriority(property));
+      }
+      clone.style.transform = 'none';
+      clone.style.transition = 'none';
+      clone.style.animation = 'none';
+      if (source instanceof HTMLInputElement && clone instanceof HTMLInputElement) clone.value = source.value;
+      if (source instanceof HTMLTextAreaElement && clone instanceof HTMLTextAreaElement) clone.value = source.value;
+      if (source instanceof HTMLSelectElement && clone instanceof HTMLSelectElement) clone.value = source.value;
     }
+
+    const sourceChildren = Array.from(source.children);
+    const cloneChildren = Array.from(clone.children);
+    for (let index = 0; index < sourceChildren.length; index += 1) {
+      const sourceChild = sourceChildren[index];
+      const cloneChild = cloneChildren[index];
+      if (sourceChild && cloneChild) inlineElementStyles(sourceChild, cloneChild);
+    }
+  };
+
+  const renderElementToPng = async (target: HTMLElement): Promise<Blob | null> => {
+    const rect = target.getBoundingClientRect();
+    const width = Math.ceil(rect.width);
+    const height = Math.ceil(rect.height);
+    if (width <= 0 || height <= 0) return null;
+
+    const clone = target.cloneNode(true) as HTMLElement;
+    inlineElementStyles(target, clone);
+    clone.style.margin = '0';
+    clone.style.width = width + 'px';
+    clone.style.height = height + 'px';
+    clone.style.boxSizing = 'border-box';
+
+    const wrapper = doc.createElement('div');
+    wrapper.setAttribute('xmlns', 'http://www.w3.org/1999/xhtml');
+    wrapper.style.width = width + 'px';
+    wrapper.style.height = height + 'px';
+    wrapper.style.overflow = 'hidden';
+    wrapper.appendChild(clone);
+
+    const serialized = new XMLSerializer().serializeToString(wrapper);
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + serialized + '</foreignObject></svg>';
+    return renderImageUrlToPng('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg));
+  };
+
+  const copyElementScreenshot = async (context: InspectContext): Promise<'binary' | 'metadata'> => {
     const canWriteBinary = typeof navigator.clipboard?.write === 'function' && typeof window.ClipboardItem === 'function';
     if (canWriteBinary) {
-      try {
-        const response = await win.fetch(image.url);
-        if (!response.ok) throw new Error(`failed:${response.status}`);
-        const blob = await response.blob();
-        if (!blob.type.startsWith('image/')) throw new Error('not-image');
-        const item = new window.ClipboardItem({ [blob.type]: blob });
-        await navigator.clipboard.write([item]);
-        return 'binary';
-      } catch {
-        // fallback below
+      const blob = await renderElementToPng(context.debugEl);
+      if (blob) {
+        try {
+          await writeImageBlobToClipboard(blob);
+          return 'binary';
+        } catch {
+          // fallback below
+        }
       }
     }
 
-    await copyText(buildImageMetadataText(image, debugId));
+    await copyText(buildScreenshotMetadataText(context));
     return 'metadata';
   };
 
@@ -468,13 +931,8 @@ export function initInspector() {
     }
 
     if (action === 'image') {
-      const image = resolveImageTarget(context.debugEl);
-      if (!image) {
-        showCopyFeedback('未找到图片', 'warning');
-        return;
-      }
-      const copyResult = await copyImageBinary(image, context.debugId);
-      showCopyFeedback(copyResult === 'binary' ? '已复制图片' : '已复制图片信息', 'success');
+      const copyResult = await copyElementScreenshot(context);
+      showCopyFeedback(copyResult === 'binary' ? '已复制节点截图' : '已复制截图信息', 'success');
       return;
     }
 
@@ -482,30 +940,23 @@ export function initInspector() {
     showCopyFeedback('已复制全部信息', 'success');
   };
 
-  const inspectByPointer = (event: MouseEvent) => {
-    if (!isInspecting || !overlay || !tooltip) return;
-    const target = event.target as HTMLElement | null;
-    if (!target) return;
-    if (isInspectorChromeTarget(target)) {
-      return;
-    }
+  const hideCurrentTarget = () => {
+    if (!overlay || !tooltip) return;
+    overlay.style.display = 'none';
+    tooltip.style.display = 'none';
+    hideActionMenu();
+    latestContext = null;
+    lastHoveredDebugEl = null;
+  };
 
-    const debugEl = target.closest('[data-debug]') as HTMLElement | null;
-    if (debugEl && debugEl === lastHoveredDebugEl && latestContext) {
-      showActionMenu(latestContext);
-      return;
-    }
-
-    if (!debugEl) {
-      overlay.style.display = 'none';
-      tooltip.style.display = 'none';
-      hideActionMenu();
-      latestContext = null;
-      lastHoveredDebugEl = null;
-      return;
-    }
-
+  const showDebugElement = (debugEl: HTMLElement) => {
+    if (!overlay || !tooltip) return;
     const debugId = debugEl.getAttribute('data-debug') || '';
+    if (!debugId) {
+      hideCurrentTarget();
+      return;
+    }
+
     const rect = debugEl.getBoundingClientRect();
     latestContext = { debugEl, debugId, rect };
     lastHoveredDebugEl = debugEl;
@@ -525,18 +976,43 @@ export function initInspector() {
     showActionMenu(latestContext);
   };
 
+  const inspectByPointer = (event: MouseEvent) => {
+    if (!isInspecting || !overlay || !tooltip) return;
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    if (isInspectorChromeTarget(target)) {
+      return;
+    }
+
+    const debugEl = findPointDebugTarget(target, event);
+    if (debugEl && debugEl === lastHoveredDebugEl && latestContext) {
+      showActionMenu(latestContext);
+      return;
+    }
+
+    if (!debugEl) {
+      hideCurrentTarget();
+      return;
+    }
+
+    showDebugElement(debugEl);
+  };
+
   const stopInspecting = () => {
     isInspecting = false;
     selectionLocked = false;
     latestContext = null;
     lastHoveredDebugEl = null;
-    toggleBtn.style.transform = 'scale(1)';
-    toggleBtn.style.background = '#0ea5e9';
+    clearAreaSelection();
+    clearLongPress();
     document.body.style.cursor = '';
     if (overlay) overlay.style.display = 'none';
     if (tooltip) tooltip.style.display = 'none';
     hideActionMenu();
+    hideCandidateMenu();
+    hideCandidateActionMenu();
     resetOverlayTone();
+    updateToggleAppearance();
   };
 
   const dialogObserver = new MutationObserver(() => {
@@ -554,6 +1030,18 @@ export function initInspector() {
     transition: all 0.1s ease-out;
   `;
   doc.body.appendChild(overlay);
+
+  selectionOverlay = document.createElement('div');
+  selectionOverlay.setAttribute('data-inspector-ignore', 'true');
+  selectionOverlay.style.cssText = `
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999999;
+    background: rgba(14, 165, 233, 0.08);
+    border: 1px solid ${defaultOverlayBorder};
+    display: none;
+  `;
+  doc.body.appendChild(selectionOverlay);
 
   tooltip = document.createElement('div');
   tooltip.style.cssText = `
@@ -590,10 +1078,10 @@ export function initInspector() {
     align-items: center;
   `;
   const actionDefinitions: Array<{ action: ActionKind; label: string }> = [
-    { action: 'id', label: '复制 ID' },
+    { action: 'id', label: '复制 Debug ID' },
     { action: 'text', label: '复制文案' },
     { action: 'image', label: '复制图片' },
-    { action: 'all', label: '全部复制' },
+    { action: 'all', label: '复制全部' },
   ];
   for (const definition of actionDefinitions) {
     const button = document.createElement('button');
@@ -601,6 +1089,7 @@ export function initInspector() {
     button.textContent = definition.label;
     button.dataset.inspectorIgnore = 'true';
     button.dataset.inspectorAction = definition.action;
+    button.dataset.inspectorMenuItem = 'true';
     button.style.cssText = `
       border: 0;
       border-radius: 8px;
@@ -622,6 +1111,43 @@ export function initInspector() {
   }
   doc.body.appendChild(actionMenu);
 
+  candidateMenu = document.createElement('div');
+  candidateMenu.setAttribute('data-inspector-ignore', 'true');
+  candidateMenu.style.cssText = `
+    position: fixed;
+    z-index: 10000001;
+    display: none;
+    min-width: 220px;
+    max-width: 320px;
+    width: min(460px, calc(100vw - 16px));
+    max-height: min(360px, calc(100vh - 16px));
+    overflow: auto;
+    padding: 6px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.98);
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.32);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  `;
+  doc.body.appendChild(candidateMenu);
+  candidateMenu.addEventListener('pointerover', showCandidateActionMenuFromEvent, { capture: true });
+  candidateMenu.addEventListener('mouseover', showCandidateActionMenuFromEvent, { capture: true });
+  candidateMenu.addEventListener('mousemove', showCandidateActionMenuFromEvent, { capture: true });
+
+  candidateActionMenu = document.createElement('div');
+  candidateActionMenu.setAttribute('data-inspector-ignore', 'true');
+  candidateActionMenu.style.cssText = `
+    position: fixed;
+    z-index: 10000002;
+    display: none;
+    min-width: 132px;
+    padding: 6px;
+    border-radius: 10px;
+    background: rgba(15, 23, 42, 0.98);
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.32);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  `;
+  doc.body.appendChild(candidateActionMenu);
+
   const stopTogglePropagation = (event: Event) => {
     suppressEvent(event);
   };
@@ -630,21 +1156,26 @@ export function initInspector() {
     toggleBtn.addEventListener(eventName, stopTogglePropagation);
   }
 
-  const handleToggleClick = (event: MouseEvent) => {
+  const startInspecting = (mode: 'single' | 'continuous', event: MouseEvent) => {
     suppressEvent(event);
-    isInspecting = !isInspecting;
-    if (isInspecting) {
-      toggleBtn.style.transform = 'scale(0.9)';
-      toggleBtn.style.background = '#ef4444';
-      doc.body.style.cursor = 'crosshair';
+    if (isInspecting && inspectMode === mode) {
+      stopInspecting();
       return;
     }
-    stopInspecting();
+    inspectMode = mode;
+    isInspecting = true;
+    doc.body.style.cursor = 'crosshair';
+    updateToggleAppearance();
   };
-  toggleBtn.onclick = handleToggleClick;
+  const handleSingleToggleClick = (event: MouseEvent) => startInspecting('single', event);
+  const handleContinuousToggleClick = (event: MouseEvent) => startInspecting('continuous', event);
+  singleToggleBtn.addEventListener('click', handleSingleToggleClick);
+  continuousToggleBtn.addEventListener('click', handleContinuousToggleClick);
 
   const handleMouseMove = (event: MouseEvent) => {
     if (!isInspecting) return;
+    if (isCandidateMenuOpen()) return;
+    if (updateAreaSelection(event)) return;
     latestHoverEvent = event;
     if (pendingHoverFrame) return;
     pendingHoverFrame = true;
@@ -653,6 +1184,29 @@ export function initInspector() {
       if (!latestHoverEvent) return;
       inspectByPointer(latestHoverEvent);
     });
+  };
+
+  const handleAreaSelectionMove = (event: Event) => {
+    if (!isInspecting || selectionLocked || !hasPointerPoint(event)) return;
+    if (isCandidateMenuOpen()) return;
+    if (updateAreaSelection(event)) {
+      suppressEvent(event, { preventDefault: true, immediate: true });
+    }
+  };
+
+  const scheduleLongPressCandidateMenu = (event: Event, target: HTMLElement | null) => {
+    const isPointerLongPress = event.type === 'pointerdown' && 'pointerType' in event && (event as PointerEvent).pointerType !== 'mouse';
+    const isTouchLongPress = event.type === 'touchstart';
+    if (!isPointerLongPress && !isTouchLongPress) return;
+
+    const point = getEventPoint(event);
+    if (!point) return;
+    clearLongPress();
+    longPressTimer = win.setTimeout(() => {
+      longPressTimer = null;
+      if (!isInspecting || selectionLocked || isAreaSelecting) return;
+      showCandidateMenu(point, target);
+    }, longPressDelay);
   };
 
   const handlePointerSuppression = (event: Event) => {
@@ -668,10 +1222,41 @@ export function initInspector() {
       event.type === 'touchend' ||
       (event.type === 'pointerup' && 'pointerType' in event && (event as PointerEvent).pointerType !== 'mouse');
 
-    suppressEvent(event, { preventDefault: true, immediate: true });
-    if (isTouchSelectionEvent) {
-      selectDebugTarget(target);
+    if ((event.type === 'pointerdown' || event.type === 'mousedown') && hasPointerPoint(event)) {
+      areaStart = { x: event.clientX, y: event.clientY };
+      isAreaSelecting = false;
     }
+    scheduleLongPressCandidateMenu(event, target);
+
+    suppressEvent(event, { preventDefault: true, immediate: true });
+    if ((event.type === 'pointerup' || event.type === 'mouseup') && hasPointerPoint(event)) {
+      clearLongPress();
+      const areaRect = buildAreaRect(event);
+      if (isAreaSelecting && areaRect) {
+        clearAreaSelection();
+        selectAreaDebugTarget(areaRect);
+        return;
+      }
+      clearAreaSelection();
+    }
+    if (event.type === 'touchend') clearLongPress();
+    if ((event.type === 'pointerup' || event.type === 'mouseup' || event.type === 'touchend') && isCandidateMenuOpen()) {
+      clearAreaSelection();
+      return;
+    }
+
+    if (isTouchSelectionEvent) {
+      selectDebugTarget(target, hasPointerPoint(event) ? event : undefined);
+    }
+  };
+
+  const handleContextMenu = (event: MouseEvent) => {
+    if (!isInspecting) return;
+    const target = event.target as HTMLElement | null;
+    if (!target || isInspectorChromeTarget(target)) return;
+    suppressEvent(event, { preventDefault: true, immediate: true });
+    clearLongPress();
+    showCandidateMenu({ clientX: event.clientX, clientY: event.clientY }, target);
   };
 
   const handleWindowClick = (event: MouseEvent) => {
@@ -683,10 +1268,14 @@ export function initInspector() {
     }
 
     suppressEvent(event, { preventDefault: true, immediate: true });
+    if (isCandidateMenuOpen()) {
+      hideCandidateMenu();
+      return;
+    }
     if (selectionLocked) {
       return;
     }
-    selectDebugTarget(target);
+    selectDebugTarget(target, event);
   };
 
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -707,6 +1296,8 @@ export function initInspector() {
   win.addEventListener('resize', scheduleAnchorUpdate);
   win.addEventListener('scroll', scheduleAnchorUpdate, true);
   doc.addEventListener('mousemove', handleMouseMove);
+  win.addEventListener('pointermove', handleAreaSelectionMove, { capture: true });
+  win.addEventListener('mousemove', handleAreaSelectionMove, { capture: true });
   win.addEventListener('pointerdown', handlePointerSuppression, { capture: true });
   win.addEventListener('pointerup', handlePointerSuppression, { capture: true });
   win.addEventListener('mousedown', handlePointerSuppression, { capture: true });
@@ -714,6 +1305,7 @@ export function initInspector() {
   win.addEventListener('touchstart', handlePointerSuppression, { capture: true });
   win.addEventListener('touchend', handlePointerSuppression, { capture: true });
   win.addEventListener('click', handleWindowClick, { capture: true });
+  win.addEventListener('contextmenu', handleContextMenu, { capture: true });
   win.addEventListener('keydown', handleKeyDown);
   updateAnchorForDialogs();
 
@@ -723,6 +1315,8 @@ export function initInspector() {
     win.removeEventListener('resize', scheduleAnchorUpdate);
     win.removeEventListener('scroll', scheduleAnchorUpdate, true);
     doc.removeEventListener('mousemove', handleMouseMove);
+    win.removeEventListener('pointermove', handleAreaSelectionMove, { capture: true });
+    win.removeEventListener('mousemove', handleAreaSelectionMove, { capture: true });
     win.removeEventListener('pointerdown', handlePointerSuppression, { capture: true });
     win.removeEventListener('pointerup', handlePointerSuppression, { capture: true });
     win.removeEventListener('mousedown', handlePointerSuppression, { capture: true });
@@ -730,14 +1324,20 @@ export function initInspector() {
     win.removeEventListener('touchstart', handlePointerSuppression, { capture: true });
     win.removeEventListener('touchend', handlePointerSuppression, { capture: true });
     win.removeEventListener('click', handleWindowClick, { capture: true });
+    win.removeEventListener('contextmenu', handleContextMenu, { capture: true });
     win.removeEventListener('keydown', handleKeyDown);
     for (const eventName of shieldedEvents) {
       toggleBtn.removeEventListener(eventName, stopTogglePropagation);
     }
-    toggleBtn.onclick = null;
+    singleToggleBtn.removeEventListener('click', handleSingleToggleClick);
+    continuousToggleBtn.removeEventListener('click', handleContinuousToggleClick);
     overlay?.remove();
+    selectionOverlay?.remove();
     tooltip?.remove();
     actionMenu?.remove();
+    candidateMenu?.remove();
+    candidateActionMenu?.remove();
+    inspectorStyle.remove();
     toggleBtn.remove();
     delete scopedWindow.__reactDebugInspectorCleanup__;
   };

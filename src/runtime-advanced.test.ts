@@ -53,14 +53,61 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
 
   const hoverTarget = (target: HTMLElement) => {
     initInspector();
-    const toggle = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
+    const toggle = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement;
     toggle.click();
     target.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
   };
 
   const waitForAsyncActions = async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let index = 0; index < 10; index += 1) {
+      await Promise.resolve();
+    }
+  };
+
+  const mockRect = (element: HTMLElement, width = 120, height = 48) => {
+    element.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: width,
+      bottom: height,
+      width,
+      height,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect);
+  };
+
+  const mockScreenshotRendering = () => {
+    const originalImage = window.Image;
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    const originalToBlob = HTMLCanvasElement.prototype.toBlob;
+
+    class MockImage {
+      crossOrigin = '';
+      naturalWidth = 120;
+      naturalHeight = 48;
+      width = 120;
+      height = 48;
+      onload: null | (() => void) = null;
+      onerror: null | (() => void) = null;
+
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+    }
+
+    window.Image = MockImage as unknown as typeof Image;
+    HTMLCanvasElement.prototype.getContext = vi.fn(() => ({ drawImage: vi.fn() })) as unknown as typeof HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.toBlob = vi.fn((callback: BlobCallback) => {
+      callback(new Blob(['png'], { type: 'image/png' }));
+    }) as unknown as typeof HTMLCanvasElement.prototype.toBlob;
+
+    return () => {
+      window.Image = originalImage;
+      HTMLCanvasElement.prototype.getContext = originalGetContext;
+      HTMLCanvasElement.prototype.toBlob = originalToBlob;
+    };
   };
 
   it('should format debug ID correctly for new format', () => {
@@ -93,27 +140,29 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     const debugId = 'src/components/Button.tsx:Button:button:42';
     testDiv.setAttribute('data-debug', debugId);
     testDiv.textContent = 'Reset Counter';
+    mockRect(testDiv);
     document.body.appendChild(testDiv);
 
     hoverTarget(testDiv);
 
-    expect(getMenuButton('复制 ID')).toBeTruthy();
+    expect(getMenuButton('复制 Debug ID')).toBeTruthy();
     expect(getMenuButton('复制文案')).toBeTruthy();
     expect(getMenuButton('复制图片')).toBeTruthy();
-    expect(getMenuButton('全部复制')).toBeTruthy();
+    expect(getMenuButton('复制全部')).toBeTruthy();
   });
 
-  it('should hide text and image actions when target has neither text nor image', () => {
+  it('should hide text action but keep screenshot action when target has no text', () => {
     const testDiv = document.createElement('div');
     testDiv.setAttribute('data-debug', 'src/components/Spacer.tsx:Spacer:div:12');
+    mockRect(testDiv);
     document.body.appendChild(testDiv);
 
     hoverTarget(testDiv);
 
-    expect(getMenuButton('复制 ID')).toBeTruthy();
+    expect(getMenuButton('复制 Debug ID')).toBeTruthy();
     expect(isMenuButtonVisible('复制文案')).toBe(false);
-    expect(isMenuButtonVisible('复制图片')).toBe(false);
-    expect(getMenuButton('全部复制')).toBeTruthy();
+    expect(getMenuButton('复制图片')).toBeTruthy();
+    expect(getMenuButton('复制全部')).toBeTruthy();
   });
 
   it('should copy full debug ID from menu', async () => {
@@ -123,7 +172,7 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     document.body.appendChild(testDiv);
 
     hoverTarget(testDiv);
-    getMenuButton('复制 ID').click();
+    getMenuButton('复制 Debug ID').click();
 
     expect(mockClipboard.writeText).toHaveBeenCalledWith(debugId);
   });
@@ -164,46 +213,49 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     expect(isMenuButtonVisible('复制文案')).toBe(false);
   });
 
-  it('should copy image binary when ClipboardItem is supported', async () => {
-    const blob = new Blob(['image'], { type: 'image/png' });
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      blob: vi.fn().mockResolvedValue(blob),
-    } as Response);
+  it('should copy node screenshot when ClipboardItem is supported', async () => {
+    const restoreScreenshotRendering = mockScreenshotRendering();
     window.ClipboardItem = vi.fn((items) => items) as unknown as typeof ClipboardItem;
 
-    const img = document.createElement('img');
-    img.setAttribute('data-debug', 'src/components/Image.tsx:Image:img:42');
-    img.src = 'https://example.com/image.png';
-    img.alt = 'Hero image';
-    document.body.appendChild(img);
+    try {
+      const card = document.createElement('div');
+      card.setAttribute('data-debug', 'src/components/Card.tsx:Card:div:42');
+      card.textContent = 'Screenshot me';
+      mockRect(card, 160, 80);
+      document.body.appendChild(card);
 
-    hoverTarget(img);
-    getMenuButton('复制图片').click();
-    await waitForAsyncActions();
+      hoverTarget(card);
+      getMenuButton('复制图片').click();
+      await waitForAsyncActions();
 
-    expect(global.fetch).toHaveBeenCalledWith('https://example.com/image.png');
-    expect(mockClipboard.write).toHaveBeenCalledTimes(1);
+      expect(mockClipboard.write).toHaveBeenCalledTimes(1);
+    } finally {
+      restoreScreenshotRendering();
+    }
   });
 
-  it('should fallback to metadata text when binary image copy fails', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('cors'));
+  it('should fallback to screenshot metadata text when screenshot copy fails', async () => {
+    const restoreScreenshotRendering = mockScreenshotRendering();
     window.ClipboardItem = vi.fn((items) => items) as unknown as typeof ClipboardItem;
+    mockClipboard.write.mockRejectedValueOnce(new Error('denied'));
 
-    const img = document.createElement('img');
-    const debugId = 'src/components/Image.tsx:Image:img:42';
-    img.setAttribute('data-debug', debugId);
-    img.src = 'https://example.com/image.png';
-    img.alt = 'Hero image';
-    img.title = 'Cover';
-    document.body.appendChild(img);
+    try {
+      const card = document.createElement('div');
+      const debugId = 'src/components/Card.tsx:Card:div:42';
+      card.setAttribute('data-debug', debugId);
+      card.textContent = 'Screenshot me';
+      mockRect(card, 160, 80);
+      document.body.appendChild(card);
 
-    hoverTarget(img);
-    getMenuButton('复制图片').click();
-    await waitForAsyncActions();
+      hoverTarget(card);
+      getMenuButton('复制图片').click();
+      await waitForAsyncActions();
 
-    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('url: https://example.com/image.png'));
-    expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining(`debugId: ${debugId}`));
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[screenshot]'));
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('debugId: ' + debugId));
+    } finally {
+      restoreScreenshotRendering();
+    }
   });
 
   it('should build structured payload for copy all', async () => {
@@ -217,7 +269,7 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     document.body.appendChild(wrapper);
 
     hoverTarget(wrapper);
-    getMenuButton('全部复制').click();
+    getMenuButton('复制全部').click();
 
     expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[debug]'));
     expect(mockClipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('[text]'));
@@ -230,7 +282,7 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     document.body.appendChild(wrapper);
 
     hoverTarget(wrapper);
-    getMenuButton('全部复制').click();
+    getMenuButton('复制全部').click();
 
     const copied = mockClipboard.writeText.mock.calls.at(-1)?.[0];
     expect(copied).toContain('[debug]');
@@ -269,7 +321,7 @@ describe('react-debug-inspector runtime - Advanced Features', () => {
     testDiv.textContent = 'No debug attribute';
     document.body.appendChild(testDiv);
 
-    const button = document.body.querySelector('button[title="开启组件定位器"]') as HTMLButtonElement;
+    const button = document.body.querySelector('button[title="单次定位：选中后自动退出"]') as HTMLButtonElement;
     button?.click();
     testDiv.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
 
