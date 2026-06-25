@@ -1,7 +1,6 @@
 name: Publish to NPM
 
 on:
-  workflow_dispatch:
   release:
     types: [created]
   workflow_run:
@@ -12,7 +11,6 @@ jobs:
   publish:
     if: |
       github.event_name == 'release' ||
-      github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
 
@@ -31,19 +29,42 @@ jobs:
           cache: 'npm'
           token: ''
 
+      - name: Read package version
+        id: package
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          VERSION=$(node -p "require('./package.json').version")
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check published version
+        id: npm
+        run: |
+          if npm view "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }}" version >/dev/null 2>&1; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "${{ steps.package.outputs.name }}@${{ steps.package.outputs.version }} is already published"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install dependencies
+        if: steps.npm.outputs.published != 'true'
         run: npm ci
 
       - name: Run tests
+        if: steps.npm.outputs.published != 'true'
         run: npm test
 
       - name: Build
+        if: steps.npm.outputs.published != 'true'
         run: npm run build
 
       - name: Upgrade npm for Trusted Publishing
+        if: steps.npm.outputs.published != 'true'
         run: npm install -g npm@^11
 
       - name: Publish to NPM
+        if: steps.npm.outputs.published != 'true'
         run: |
           unset NODE_AUTH_TOKEN
           npm publish --provenance --access public
