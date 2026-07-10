@@ -400,14 +400,13 @@ describe('react-debug-inspector runtime', () => {
   });
 
   it('should copy debug id on touchend selection without waiting for click', async () => {
-    const writeText = async () => undefined;
-    const clipboard = { writeText };
-    Object.assign(navigator, { clipboard });
-
     const writeSpyCalls: string[] = [];
-    clipboard.writeText = async (value: string) => {
-      writeSpyCalls.push(value);
+    const clipboard = {
+      writeText: async (value: string) => {
+        writeSpyCalls.push(value);
+      },
     };
+    Object.assign(navigator, { clipboard });
 
     const target = document.createElement('article');
     const debugId = 'src/pages/DetailCard.tsx:DetailCard:article:12';

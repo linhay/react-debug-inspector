@@ -26,18 +26,43 @@ export default function babelPluginDebugLabel() {
           VariableDeclarator(path: any) {
             const name = path.node.id?.name;
             if (!name || name[0] !== name[0].toUpperCase()) return;
-            const init = path.node.init;
-            if (
-              init &&
-              (init.type === 'ArrowFunctionExpression' || init.type === 'FunctionExpression')
-            ) {
-              injectAllJSX(path.get('init'), name, relativePath);
-            }
+            const componentPath = getComponentFunctionPath(path.get('init'));
+            if (componentPath) injectAllJSX(componentPath, name, relativePath);
           },
         });
       },
     },
   };
+
+  function getComponentFunctionPath(path: any): any | null {
+    if (!path?.node) return null;
+
+    if (path.isArrowFunctionExpression() || path.isFunctionExpression()) {
+      return path;
+    }
+
+    if (!path.isCallExpression() || !isReactComponentWrapper(path.node.callee)) {
+      return null;
+    }
+
+    const firstArgument = path.get('arguments.0');
+    return getComponentFunctionPath(firstArgument);
+  }
+
+  function isReactComponentWrapper(callee: any): boolean {
+    if (callee?.type === 'Identifier') {
+      return callee.name === 'memo' || callee.name === 'forwardRef';
+    }
+
+    return (
+      callee?.type === 'MemberExpression' &&
+      !callee.computed &&
+      callee.object?.type === 'Identifier' &&
+      callee.object.name === 'React' &&
+      callee.property?.type === 'Identifier' &&
+      (callee.property.name === 'memo' || callee.property.name === 'forwardRef')
+    );
+  }
 
   function injectAllJSX(path: any, componentName: string, filePath: string) {
     path.traverse({

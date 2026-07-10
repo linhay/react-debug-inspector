@@ -166,6 +166,38 @@ describe('babel-plugin-debug-label - Edge Cases', () => {
     expect(output).toContain('data-debug="src/Async.tsx:AsyncComponent:div:3"');
   });
 
+  it.each([
+    ['memo with a named function', 'memo(function Card() { return <div><span>Card</span></div>; })'],
+    ['memo with an arrow function', 'memo(() => <div><span>Card</span></div>)'],
+    ['React.memo', 'React.memo(() => <div><span>Card</span></div>)'],
+    [
+      'forwardRef',
+      'forwardRef(function Card(props, ref) { return <div ref={ref}><span>Card</span></div>; })',
+    ],
+    [
+      'React.forwardRef',
+      'React.forwardRef((props, ref) => <div ref={ref}><span>Card</span></div>)',
+    ],
+    [
+      'nested memo and forwardRef',
+      'memo(React.forwardRef((props, ref) => <div ref={ref}><span>Card</span></div>))',
+    ],
+  ])('should handle components wrapped with %s', (_, initializer) => {
+    const output = transform(`const Card = ${initializer};`, '/test/src/Card.tsx');
+
+    expect(output).toContain('data-debug="src/Card.tsx:Card:div:1"');
+    expect(output).toContain('data-debug="src/Card.tsx:Card:span:1"');
+  });
+
+  it('should not unwrap arbitrary call expressions', () => {
+    const input = `
+      const Card = connect(() => <div>Card</div>);
+    `;
+    const output = transform(input, '/test/src/Card.tsx');
+
+    expect(output).not.toContain('data-debug');
+  });
+
   it('should preserve existing attributes', () => {
     const input = `
       function Button() {

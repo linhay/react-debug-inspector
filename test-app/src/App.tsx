@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import './App.css';
 
 const previewImage =
@@ -190,7 +190,7 @@ function Dialog({ children, onClose }: { children: React.ReactNode; onClose: () 
   );
 }
 
-function List({ items }: { items: string[] }) {
+const List = memo(function List({ items }: { items: string[] }) {
   return (
     <ul className="list">
       {items.map((item, index) => (
@@ -200,6 +200,6 @@ function List({ items }: { items: string[] }) {
       ))}
     </ul>
   );
-}
+});
 
 export default App;

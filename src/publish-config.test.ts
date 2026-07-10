@@ -27,6 +27,7 @@ describe('NPM 发布工作流配置', () => {
     expect(workflow).toContain('workflow_run:');
     expect(workflow).toContain('workflows: ["Version Bump and Release"]');
     expect(workflow).toContain('types: [completed]');
+    expect(workflow).toContain("github.event_name == 'workflow_dispatch'");
   });
 
   it('应使用 Trusted Publishing（不依赖 NPM_TOKEN）', () => {

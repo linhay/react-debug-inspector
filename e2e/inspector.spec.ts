@@ -275,6 +275,15 @@ test.describe('React Debug Inspector E2E', () => {
     expect(buttonDebug).toContain('App.tsx:Button:button');
   });
 
+  test('should inject debug attributes into mapped items inside memo components', async ({ page }) => {
+    const listItems = page.locator('.list-item');
+    await expect(listItems).toHaveCount(3);
+
+    for (const listItem of await listItems.all()) {
+      await expect(listItem).toHaveAttribute('data-debug', /App\.tsx:List:li:/);
+    }
+  });
+
   test('should work with dynamic content', async ({ page }) => {
     // 点击 Increment 按钮
     const incrementBtn = page.locator('button:has-text("Increment")');
