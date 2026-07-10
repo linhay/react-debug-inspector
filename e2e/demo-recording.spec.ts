@@ -42,11 +42,11 @@ test.describe('Demo 视频录制', () => {
       window.addEventListener('mouseup', () => cursor.classList.remove('is-clicking'));
     });
 
-    const inspectButton = page.locator('button[title="开启组件定位器"]');
+    const inspectButton = page.getByRole('button', { name: '单次', exact: true });
     const title = page.getByRole('heading', { name: 'Inspect Faster, Fix Sooner' });
     const image = page.locator('img[alt="Inspector preview card"]');
-    const copyImageButton = page.getByRole('button', { name: '复制图片' });
-    const copyAllButton = page.getByRole('button', { name: '全部复制' });
+    const copyDebugButton = page.getByRole('button', { name: '复制 Debug ID' });
+    const copyAllButton = page.getByRole('button', { name: '复制全部' });
     const pasteInput = page.locator('#demo-paste-input');
 
     await expect(inspectButton).toBeVisible();
@@ -102,30 +102,30 @@ test.describe('Demo 视频录制', () => {
     expect(copiedDebugId).toContain('App.tsx');
     await appendToInput(`[STEP1] ${copiedDebugId}`);
 
-    // Step 3: 再次进入检查模式，复制图片信息并粘贴
+    // Step 3: 再次进入检查模式，复制包含图片信息的完整上下文并粘贴
     await page.mouse.move(1260, 780);
     await page.waitForTimeout(500);
     await ensureInspectionMode();
 
     await image.hover();
     await page.waitForTimeout(700);
-    await copyImageButton.click();
+    await copyAllButton.click();
     await page.waitForTimeout(500);
 
     const copiedImagePayload = await page.evaluate(() => navigator.clipboard.readText());
     expect(copiedImagePayload).toContain('[image]');
     await appendToInput(`[STEP2]\n${copiedImagePayload}`);
 
-    // Step 4: 在同一轮检查模式中执行“全部复制”并继续粘贴
+    // Step 4: 在同一轮检查模式中复制图片节点的 Debug ID 并继续粘贴
     await ensureInspectionMode();
     await image.hover();
     await page.waitForTimeout(500);
-    await expect(copyAllButton).toBeVisible();
-    await copyAllButton.click();
+    await expect(copyDebugButton).toBeVisible();
+    await copyDebugButton.click();
     await page.waitForTimeout(500);
 
     const copiedAllPayload = await page.evaluate(() => navigator.clipboard.readText());
-    expect(copiedAllPayload).toContain('[debug]');
+    expect(copiedAllPayload).toContain('App.tsx');
     await appendToInput(`[STEP3]\n${copiedAllPayload}`);
 
     // Step 5: 退出检查模式收尾

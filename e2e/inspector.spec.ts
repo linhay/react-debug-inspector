@@ -1,4 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const getSingleToggle = (page: Page) =>
+  page.getByRole('button', { name: '单次', exact: true });
+
+const getContinuousToggle = (page: Page) =>
+  page.getByRole('button', { name: '持续', exact: true });
 
 test.describe('React Debug Inspector E2E', () => {
   test.beforeEach(async ({ page }) => {
@@ -25,22 +31,20 @@ test.describe('React Debug Inspector E2E', () => {
     expect(h1Debug).toContain('App.tsx:App:h1');
   });
 
-  test('should show toggle button', async ({ page }) => {
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
-    await expect(toggleBtn).toBeVisible();
-    await expect(toggleBtn).toHaveText('🎯');
+  test('should show inspection mode controls', async ({ page }) => {
+    await expect(getSingleToggle(page)).toBeVisible();
+    await expect(getSingleToggle(page)).toHaveAttribute('title', '单次定位：选中后自动退出');
+    await expect(getContinuousToggle(page)).toBeVisible();
+    await expect(getContinuousToggle(page)).toHaveAttribute('title', '持续定位：保持开启，按 Esc 退出');
   });
 
   test('should enter inspection mode on button click', async ({ page }) => {
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
 
     // 点击进入检查模式
     await toggleBtn.click();
 
-    // 检查按钮样式变化（背景色变红）
-    const bgColor = await toggleBtn.evaluate((el) => (el as HTMLElement).style.background);
-    // 可能是 #ef4444 或 rgb(239, 68, 68)
-    expect(bgColor === '#ef4444' || bgColor === 'rgb(239, 68, 68)').toBe(true);
+    await expect(toggleBtn).toHaveCSS('background-color', 'rgb(14, 165, 233)');
 
     // 检查 body cursor 变化
     const cursor = await page.evaluate(() => document.body.style.cursor);
@@ -48,7 +52,7 @@ test.describe('React Debug Inspector E2E', () => {
   });
 
   test('should highlight element on hover in inspection mode', async ({ page }) => {
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     // 悬停在 h1 元素上
@@ -57,11 +61,6 @@ test.describe('React Debug Inspector E2E', () => {
 
     // 等待一下让 overlay 和 tooltip 显示
     await page.waitForTimeout(100);
-
-    // 检查 overlay 是否显示
-    const overlay = page.locator('div').filter({
-      has: page.locator('css=[style*="pointer-events: none"]')
-    }).first();
 
     // 检查 tooltip 是否显示并包含正确的文本
     const tooltips = page.locator('div').filter({
@@ -75,7 +74,7 @@ test.describe('React Debug Inspector E2E', () => {
     // 授予剪贴板权限
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     // 点击 h1 元素
@@ -90,7 +89,7 @@ test.describe('React Debug Inspector E2E', () => {
     expect(clipboardText).toContain('App.tsx:App:h1');
 
     // 检查是否显示成功提示
-    const successTooltip = page.locator('div:has-text("✅ Copied!")');
+    const successTooltip = page.locator('div:has-text("已复制 Debug ID")');
     await expect(successTooltip).toBeVisible();
 
     // 等待自动退出检查模式
@@ -104,7 +103,7 @@ test.describe('React Debug Inspector E2E', () => {
   test('should not trigger React onClick while selecting an element', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const openDialogButton = page.getByRole('button', { name: 'Open Dialog' });
@@ -119,7 +118,7 @@ test.describe('React Debug Inspector E2E', () => {
   test('should not trigger clickable card React onClick while selecting an element', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const clickableCard = page.locator('article.clickable-card');
@@ -134,7 +133,7 @@ test.describe('React Debug Inspector E2E', () => {
   test('should not trigger early mouse handlers while selecting an element', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const pressableCard = page.locator('article.pressable-card');
@@ -149,7 +148,7 @@ test.describe('React Debug Inspector E2E', () => {
   test('should not trigger pointer handlers while selecting an element', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const pointerCard = page.locator('article.pointer-card');
@@ -163,7 +162,7 @@ test.describe('React Debug Inspector E2E', () => {
   });
 
   test('should exit inspection mode on Escape key', async ({ page }) => {
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     // 按 Escape 键
@@ -173,31 +172,28 @@ test.describe('React Debug Inspector E2E', () => {
     const cursor = await page.evaluate(() => document.body.style.cursor);
     expect(cursor).toBe('');
 
-    // 检查按钮样式恢复
-    const bgColor = await toggleBtn.evaluate((el) =>
-      window.getComputedStyle(el).backgroundColor
-    );
-    expect(bgColor).toBe('rgb(14, 165, 233)'); // #0ea5e9
+    const background = await toggleBtn.evaluate((el) => (el as HTMLElement).style.background);
+    expect(background).toBe('transparent');
   });
 
   test('should show copy menu items in inspection mode', async ({ page }) => {
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const image = page.locator('img[alt="Inspector preview card"]');
     await image.hover();
     await page.waitForTimeout(100);
 
-    await expect(page.getByRole('button', { name: '复制 ID' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '复制 Debug ID' })).toBeVisible();
     await expect(page.getByRole('button', { name: '复制文案' })).toBeVisible();
     await expect(page.getByRole('button', { name: '复制图片' })).toBeVisible();
-    await expect(page.getByRole('button', { name: '全部复制' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '复制全部' })).toBeVisible();
   });
 
-  test('should support copying visible text and image metadata from menu', async ({ page }) => {
+  test('should support copying visible text and image data from menu', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const h1 = page.locator('h1');
@@ -211,21 +207,33 @@ test.describe('React Debug Inspector E2E', () => {
     const image = page.locator('img[alt="Inspector preview card"]');
     await image.hover();
     await page.getByRole('button', { name: '复制图片' }).click();
-    await page.waitForTimeout(100);
+    await expect(page.locator('div').filter({ hasText: /已复制(?:节点截图|截图信息)/ })).toBeVisible();
 
-    const imagePayload = await page.evaluate(() => navigator.clipboard.readText());
-    expect(imagePayload).toContain('[image]');
+    const imagePayload = await page.evaluate(async () => {
+      const items = await navigator.clipboard.read();
+      return Promise.all(items.map(async (item) => ({
+        types: item.types,
+        text: item.types.includes('text/plain')
+          ? await (await item.getType('text/plain')).text()
+          : '',
+      })));
+    });
+    expect(
+      imagePayload.some(
+        (item) => item.types.includes('image/png') || item.text.includes('[screenshot]'),
+      ),
+    ).toBe(true);
   });
 
   test('should support copy all payload from menu', async ({ page }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     const image = page.locator('img[alt="Inspector preview card"]');
     await image.hover();
-    await page.getByRole('button', { name: '全部复制' }).click();
+    await page.getByRole('button', { name: '复制全部' }).click();
     await page.waitForTimeout(100);
 
     const payload = await page.evaluate(() => navigator.clipboard.readText());
@@ -235,7 +243,7 @@ test.describe('React Debug Inspector E2E', () => {
   });
 
   test('should format debug info correctly', async ({ page }) => {
-    const toggleBtn = page.locator('button[title="开启组件定位器"]');
+    const toggleBtn = getSingleToggle(page);
     await toggleBtn.click();
 
     // 悬停在 h1 元素上（更容易定位）

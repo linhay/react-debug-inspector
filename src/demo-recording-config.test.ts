@@ -16,11 +16,13 @@ describe('Demo 视频录制配置', () => {
       scripts?: Record<string, string>;
     };
     const demoConfig = read('playwright.demo.config.ts');
+    const defaultConfig = read('playwright.config.ts');
 
     expect(packageJson.scripts?.['record:demo']).toBe(
       'playwright test e2e/demo-recording.spec.ts --config playwright.demo.config.ts'
     );
     expect(demoConfig).toContain("video: 'on'");
     expect(demoConfig).toContain("testDir: './e2e'");
+    expect(defaultConfig).toContain("testIgnore: ['demo-recording.spec.ts']");
   });
 });
